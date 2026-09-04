@@ -1,0 +1,67 @@
+{
+  "school_info": {
+    "session": "2023-24",
+    "name": "शासकीय माध्यमिक विद्यालय",
+    "udise": "23260100101",
+    "medium": "Hindi (हिन्दी)",
+    "class_level": "Class 1st to 8th",
+    "address": "Bhadbhada Road, Bhopal",
+    "block": "Fanda",
+    "district": "Bhopal",
+    "contact": "",
+    "email": "",
+    "logo_b64": null,
+    "sign_b64": null
+  },
+  "classes_list": [
+    "Class 1st",
+    "Class 2nd",
+    "Class 3rd",
+    "Class 4th",
+    "Class 5th",
+    "Class 6th",
+    "Class 7th",
+    "Class 8th"
+  ],
+  "data_store": {
+    "Class 7th": {
+      "students": [
+        {
+          "Roll_No": 101,
+          "Scholar_No": "1001",
+          "Name": "Aarav Sharma",
+          "Father_Name": "Ramesh Sharma",
+          "Mother_Name": "Sunita Sharma",
+          "DOB": "2013-05-12",
+          "Class": "Class 7th",
+          "Section": "A",
+          "Gender": "Boy",
+          "Category": "OBC",
+          "SSSM_ID": "123456789",
+          "Aadhar_No": "",
+          "Medium": "Hindi (हिन्दी)",
+          "Status": "Present",
+          "Photo_b64": null,
+          "Total_Days": 220,
+          "Attended_Days": 204
+        }
+      ],
+      "evaluations": {},
+      "monthly_attendance": [],
+      "working_days": {
+        "Apr": 24,
+        "May": 0,
+        "Jun": 12,
+        "Jul": 25,
+        "Aug": 24,
+        "Sep": 24,
+        "Oct": 20,
+        "Nov": 22,
+        "Dec": 24,
+        "Jan": 23,
+        "Feb": 22,
+        "Mar": 20
+      }
+    }
+  }
+}
