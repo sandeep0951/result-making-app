@@ -344,10 +344,11 @@ I18N = {
         "nav_student": "👨‍🎓 2. विद्यार्थी मास्टर (Student Master)",
         "nav_attendance": "📅 3. माहवार उपस्थिति पत्रक (Monthly Attendance)",
         "nav_eval": "📝 4. परीक्षा एवं गतिविधि मूल्यांकन (Evaluation Entry)",
-        "nav_marksheet": "🖨️ 5. वार्षिक प्रगति पत्रक (Print Marksheet)",
-        "nav_a3_result": "📜 6. A3 वार्षिक परीक्षाफल पत्रक (Annual Result Sheet)",
-        "nav_summary": "📊 7. श्रेणीवार परीक्षा परिणाम सारांश (Result Summary)",
-        "nav_promote": "🔄 8. सत्र परिवर्तन एवं कक्षा पदोन्नति (Session Promotion)",
+        "nav_viewer": "🔍 5. छात्र संपूर्ण डेटा समीक्षा (Student Data Viewer)",
+        "nav_marksheet": "🖨️ 6. वार्षिक प्रगति पत्रक (Print Marksheet)",
+        "nav_a3_result": "📜 7. A3 वार्षिक परीक्षाफल पत्रक (Annual Result Sheet)",
+        "nav_summary": "📊 8. श्रेणीवार परीक्षा परिणाम सारांश (Result Summary)",
+        "nav_promote": "🔄 9. सत्र परिवर्तन एवं कक्षा पदोन्नति (Session Promotion)",
         "backup_restore": "💾 बैकअप एवं रीस्टोर (Backup / Restore)",
         "download_backup": "📥 बैकअप फ़ाइल डाउनलोड करें (JSON)",
         "restore_backup": "📂 बैकअप से रीस्टोर करें",
@@ -369,10 +370,11 @@ I18N = {
         "nav_student": "👨‍🎓 2. Student Master",
         "nav_attendance": "📅 3. Monthly Attendance Sheet",
         "nav_eval": "📝 4. Marks & Activity Evaluation",
-        "nav_marksheet": "🖨️ 5. Progress Report Card (Marksheet)",
-        "nav_a3_result": "📜 6. A3 Annual Result Sheet",
-        "nav_summary": "📊 7. Category/Grade Wise Result Summary",
-        "nav_promote": "🔄 8. Session Roll-over & Promotion",
+        "nav_viewer": "🔍 5. Student Complete Data Viewer",
+        "nav_marksheet": "🖨️ 6. Progress Report Card (Marksheet)",
+        "nav_a3_result": "📜 7. A3 Annual Result Sheet",
+        "nav_summary": "📊 8. Category/Grade Wise Result Summary",
+        "nav_promote": "🔄 9. Session Roll-over & Promotion",
         "backup_restore": "💾 Backup & Restore",
         "download_backup": "📥 Download Backup File (JSON)",
         "restore_backup": "📂 Restore from Backup File",
@@ -394,10 +396,11 @@ I18N = {
         "nav_student": "👨‍🎓 2. विद्यार्थी मास्टर (Student Master)",
         "nav_attendance": "📅 3. मासिक उपस्थिती पत्रक (Monthly Attendance)",
         "nav_eval": "📝 4. परीक्षा व मूल्यमापन (Evaluation Entry)",
-        "nav_marksheet": "🖨️ 5. प्रगती पत्रक (Marksheet)",
-        "nav_a3_result": "📜 6. A3 वार्षिक निकाल पत्रक (Annual Result Sheet)",
-        "nav_summary": "📊 7. प्रवर्गनिहाय निकाल गोषवारा (Result Summary)",
-        "nav_promote": "🔄 8. सत्र बदल व वर्ग पदोन्नती (Promotion)",
+        "nav_viewer": "🔍 5. विद्यार्थी संपूर्ण माहिती दर्शक (Student Data Viewer)",
+        "nav_marksheet": "🖨️ 6. प्रगती पत्रक (Marksheet)",
+        "nav_a3_result": "📜 7. A3 वार्षिक निकाल पत्रक (Annual Result Sheet)",
+        "nav_summary": "📊 8. प्रवर्गनिहाय निकाल गोषवारा (Result Summary)",
+        "nav_promote": "🔄 9. सत्र बदल व वर्ग पदोन्नती (Promotion)",
         "backup_restore": "💾 बॅकअप आणि पुनर्संचयित (Backup/Restore)",
         "download_backup": "📥 बॅकअप फाईल डाउनलोड करा (JSON)",
         "restore_backup": "📂 बॅकअपमधून पुनर्संचयित करा",
@@ -651,6 +654,7 @@ with st.sidebar:
             T["nav_student"],
             T["nav_attendance"],
             T["nav_eval"],
+            T["nav_viewer"],
             T["nav_marksheet"],
             T["nav_a3_result"],
             T["nav_summary"],
@@ -1174,7 +1178,311 @@ elif menu == T["nav_eval"]:
             save_data_to_disk()
             st.success(f"✅ रोल नंबर {sel_roll} का संपूर्ण मूल्यांकन सफलतापूर्वक ऑटो-सेव हो गया!")
 
-# ----------------- MODULE 5: PRINT MARKSHEET (EXACT REPLICA) -----------------
+# ----------------- MODULE 5: STUDENT COMPLETE DATA DOSSIER & VIEWER -----------------
+elif menu == T["nav_viewer"]:
+    st.markdown(f'<div class="main-header">🔍 छात्र संपूर्ण डेटा समीक्षा (Student 360° Data Dossier)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-header">कक्षा एवं सेक्शन चुनें — केवल उन विद्यार्थियों की सूची दिखेगी जिनका डेटा दर्ज हो चुका है। नाम पर क्लिक करने पर पूरा डेटा खुलेगा।</div>', unsafe_allow_html=True)
+
+    if "active_dossier_roll" not in st.session_state:
+        st.session_state.active_dossier_roll = None
+
+    # Step 1: Class & Section Selectors
+    c_v_top1, c_v_top2, c_v_top3 = st.columns([2, 2, 2])
+    with c_v_top1:
+        v_class = st.selectbox(
+            "1. कक्षा चुनें (Select Class):", 
+            st.session_state.classes_list, 
+            index=st.session_state.classes_list.index(selected_class) if selected_class in st.session_state.classes_list else 0,
+            key="viewer_class_sel"
+        )
+    
+    v_cls_data = get_class_data(v_class)
+    v_students_df = v_cls_data["students"]
+    v_evals = v_cls_data["evaluations"]
+    v_subjects = get_class_subjects(v_class)
+    v_sub_count = len(v_subjects)
+    v_max_total = v_sub_count * 100
+
+    # Section choices
+    existing_secs = sorted(list(set([str(s).strip() for s in v_students_df["Section"].dropna().unique() if str(s).strip()]))) if not v_students_df.empty and "Section" in v_students_df.columns else ["A"]
+    all_sec_options = ["सभी सेक्शन (All Sections)"] + (existing_secs if existing_secs else ["A", "B", "C", "D", "E"])
+    
+    with c_v_top2:
+        v_section = st.selectbox("2. सेक्शन चुनें (Select Section):", all_sec_options, key="viewer_sec_sel")
+
+    # Reset active student if class or section changes
+    if v_class != st.session_state.get("last_viewer_class") or v_section != st.session_state.get("last_viewer_sec"):
+        st.session_state.active_dossier_roll = None
+        st.session_state.last_viewer_class = v_class
+        st.session_state.last_viewer_sec = v_section
+
+    # Filter students by section
+    if v_section != "सभी सेक्शन (All Sections)" and not v_students_df.empty:
+        filtered_df = v_students_df[v_students_df["Section"] == v_section].copy()
+    else:
+        filtered_df = v_students_df.copy()
+
+    # Identify students whose data has been entered
+    data_entered_students = []
+    if not filtered_df.empty:
+        for _, s in filtered_df.iterrows():
+            r = s["Roll_No"]
+            if r in v_evals and "marks" in v_evals[r] and bool(v_evals[r]["marks"]):
+                data_entered_students.append(s)
+
+    tot_enrolled = len(filtered_df)
+    data_entered_cnt = len(data_entered_students)
+
+    with c_v_top3:
+        st.markdown(f'''
+        <div style="border: 1px solid #93C5FD; background: #EFF6FF; padding: 8px 12px; border-radius: 6px; text-align: center; margin-top: 15px;">
+            <span style="font-size: 13px; color: #1E3A8A; font-weight: bold;">डेटा प्रविष्टि स्थिति:</span><br>
+            <span style="font-size: 16px; font-weight: 800; color: #008000;">{data_entered_cnt}</span> / {tot_enrolled} छात्र पूर्ण
+        </div>
+        ''', unsafe_allow_html=True)
+
+    st.divider()
+
+    # ================== VIEW STATE 1: ONLY LIST OF STUDENTS IS SHOWN ==================
+    if st.session_state.active_dossier_roll is None:
+        st.markdown(f"### 📋 {v_class} ({v_section}) — मूल्यांकन दर्ज विद्यार्थियों की सूची")
+        
+        if data_entered_cnt == 0:
+            st.info(f"ℹ️ {v_class} ({v_section}) में अभी किसी भी विद्यार्थी के परीक्षा अंक दर्ज नहीं हुए हैं।")
+            if tot_enrolled > 0:
+                st.caption(f"💡 कुल {tot_enrolled} छात्र पंजीकृत हैं। आप साइडबार में **'📝 4. परीक्षा एवं गतिविधि मूल्यांकन'** में जाकर उनके अंक भर सकते हैं।")
+        else:
+            # Export options for all data-entered students in this class & section
+            with st.expander("📥 इस कक्षा/सेक्शन के सभी डेटा-दर्ज छात्रों का रिकॉर्ड एक्सपोर्ट करें (Export Roster Data)", expanded=False):
+                col_t5_exp1, col_t5_exp2, col_t5_exp3 = st.columns([3, 2, 3])
+                with col_t5_exp1:
+                    t5_exp_type = st.selectbox(
+                        "प्रारूप चुनें (Template):",
+                        [
+                            "📋 संपूर्ण छात्रवार रिकॉर्ड (44-Column Master Dossier)",
+                            "🏛️ RSKMP पोर्टल प्रारूप (rskmp.in Upload Template)",
+                            "🏢 MPBSE बोर्ड प्रारूप (mpbse.nic.in Format)"
+                        ],
+                        key="t5_exp_type_choice"
+                    )
+                with col_t5_exp2:
+                    t5_file_ext = st.selectbox("फ़ाइल फॉर्मेट:", ["Excel (.xlsx)", "CSV (.csv)"], key="t5_file_ext_choice")
+                with col_t5_exp3:
+                    st.markdown("<div style='margin-top: 28px;'>", unsafe_allow_html=True)
+                    export_students_df = pd.DataFrame(data_entered_students)
+                    if "RSKMP" in t5_exp_type:
+                        t5_out_df = generate_rskmp_df(export_students_df, v_evals, v_subjects, st.session_state.school_info, v_class)
+                        t5_fn_prefix = f"RSKMP_Dossier_{v_class}_{v_section}_{st.session_state.school_info.get('session','2023-24')}"
+                    elif "MPBSE" in t5_exp_type:
+                        t5_out_df = generate_mpbse_df(export_students_df, v_evals, v_subjects, st.session_state.school_info, v_class)
+                        t5_fn_prefix = f"MPBSE_Dossier_{v_class}_{v_section}_{st.session_state.school_info.get('session','2023-24')}"
+                    else:
+                        t5_out_df = generate_master_44col_df(export_students_df, v_evals, v_subjects, st.session_state.school_info, v_class)
+                        t5_fn_prefix = f"Students_Master_Dossier_{v_class}_{v_section}_{st.session_state.school_info.get('session','2023-24')}"
+
+                    t5_bytes, t5_mime, t5_ext = export_dataframe_bytes(t5_out_df, t5_file_ext)
+                    st.download_button(
+                        f"🚀 डेटा डाउनलोड करें ({t5_file_ext})",
+                        data=t5_bytes,
+                        file_name=f"{t5_fn_prefix}{t5_ext}",
+                        mime=t5_mime,
+                        type="primary",
+                        use_container_width=True,
+                        key="btn_download_t5_all"
+                    )
+                    st.markdown("</div>", unsafe_allow_html=True)
+
+            st.caption("👉 जिस भी विद्यार्थी का संपूर्ण डेटा देखना है, उसके नाम के सामने **'👁️ पूरा डेटा देखें'** बटन पर क्लिक करें:")
+            
+            # Interactive student cards list
+            for idx, s in enumerate(data_entered_students):
+                r = s["Roll_No"]
+                ev = v_evals.get(r, {})
+                marks_dict = ev.get("marks", {})
+                
+                # Compute total and percentage
+                tot_obt = sum([marks_dict.get(sub["id"], {}).get("total", 0) for sub in v_subjects])
+                pct = round((tot_obt / v_max_total) * 100, 1) if v_max_total else 0
+                grd = calculate_grade(pct)
+                is_p = (pct >= 33 and ev.get("status", "Present") != "Absent")
+                res_txt = "Pass" if is_p else "Fail"
+                res_col = "#008000" if is_p else "#CC0000"
+
+                # Photo thumbnail
+                if s.get("Photo_b64"):
+                    thumb_html = f'<img src="data:image/jpeg;base64,{s["Photo_b64"]}" style="width: 50px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid #ccc;">'
+                else:
+                    thumb_html = '<div style="width: 50px; height: 60px; background: #f1f5f9; border: 1px dashed #cbd5e1; display: flex; align-items: center; justify-content: center; font-size: 20px; border-radius: 4px;">👤</div>'
+
+                card_c1, card_c2, card_c3, card_c4 = st.columns([1, 4, 3, 2])
+                with card_c1:
+                    render_html(thumb_html)
+                with card_c2:
+                    st_info_txt = f"**{s['Name']}** (रोल नंबर: `{r}`)  <br><span style='font-size: 12px; color: #555;'>दाखिला क्र.: {s.get('Scholar_No','--')} | पिता: {s.get('Father_Name','--')} | जन्मतिथि: {s.get('DOB','--')}</span>"
+                    st.markdown(st_info_txt, unsafe_allow_html=True)
+                with card_c3:
+                    st.markdown(f"<span style='font-size: 13px;'>कुल प्राप्तांक: <b>{tot_obt}/{v_max_total}</b> ({pct}%)</span><br>"
+                                f"<span style='font-size: 12px;'>परिणाम: <b style='color:{res_col};'>{res_txt}</b> | ग्रेड: <b>{grd}</b> | उपस्थिति: <b>{s.get('Attended_Days',200)}/{s.get('Total_Days',220)}</b></span>", 
+                                unsafe_allow_html=True)
+                with card_c4:
+                    st.markdown("<div style='margin-top: 10px;'>", unsafe_allow_html=True)
+                    if st.button(f"👁️ पूरा डेटा देखें", key=f"btn_view_dossier_{r}", type="primary", use_container_width=True):
+                        st.session_state.active_dossier_roll = r
+                        st.rerun()
+                    st.markdown("</div>", unsafe_allow_html=True)
+
+                st.markdown("<hr style='margin: 6px 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
+
+    # ================== VIEW STATE 2: FULL DATA IS SHOWN ONLY ON CLICK ==================
+    else:
+        cur_sel_roll = st.session_state.active_dossier_roll
+        target_student = v_students_df[v_students_df["Roll_No"] == cur_sel_roll].iloc[0]
+        t_ev = v_evals.get(cur_sel_roll, {})
+        t_marks = t_ev.get("marks", {})
+
+        c_back1, c_back2, c_back3 = st.columns([2, 1, 1])
+        with c_back1:
+            st.markdown(f"### 📋 विद्यार्थी संपूर्ण रिकॉर्ड: {target_student['Name']} (Roll: {cur_sel_roll})")
+        with c_back2:
+            single_st_df = generate_master_44col_df(pd.DataFrame([target_student]), v_evals, v_subjects, st.session_state.school_info, v_class)
+            s_b, s_m, s_ext = export_dataframe_bytes(single_st_df, "Excel (.xlsx)")
+            st.download_button(
+                "📥 यह रिकॉर्ड (Excel)",
+                data=s_b,
+                file_name=f"Student_{cur_sel_roll}_{target_student['Name']}_{st.session_state.school_info.get('session','2023-24')}.xlsx",
+                mime=s_m,
+                use_container_width=True,
+                key=f"btn_single_exp_{cur_sel_roll}"
+            )
+        with c_back3:
+            if st.button("⬅️ वापस छात्र सूची", type="secondary", use_container_width=True):
+                st.session_state.active_dossier_roll = None
+                st.rerun()
+
+        # 1. Identity & Bio-Data
+        col_dos_left, col_dos_right = st.columns([1, 2])
+
+        with col_dos_left:
+            st.markdown("#### 🖼️ विद्यार्थी पहचान (Identity Card)")
+            if target_student.get("Photo_b64"):
+                st.image(base64.b64decode(target_student["Photo_b64"]), width=150, caption=f"Roll: {cur_sel_roll}")
+            else:
+                st.markdown('<div style="width: 140px; height: 170px; border: 2px dashed #999; display: flex; align-items: center; justify-content: center; text-align: center; color: #777; font-size: 13px; border-radius: 6px; background: #f8fafc;">पासपोर्ट फोटो<br>अपलोड नहीं है</div>', unsafe_allow_html=True)
+            
+            st.caption(f"**सक्रिय सत्र:** {st.session_state.school_info.get('session','2023-24')}")
+            st.caption(f"**स्कूल:** {st.session_state.school_info.get('name','')}")
+            st.caption(f"**डाइस कोड:** {st.session_state.school_info.get('udise','')}")
+
+        with col_dos_right:
+            st.markdown("#### 👤 व्यक्तिगत विवरण (Student Bio-Data)")
+            b_c1, b_c2 = st.columns(2)
+            with b_c1:
+                st.markdown(f"**विद्यार्थी का नाम:** {target_student['Name']}")
+                st.markdown(f"**पिता का नाम:** {target_student['Father_Name']}")
+                st.markdown(f"**माता का नाम:** {target_student['Mother_Name']}")
+                st.markdown(f"**जन्मतिथि:** {target_student['DOB']}")
+                st.markdown(f"**जेंडर / लिंग:** {target_student['Gender']}")
+            with b_c2:
+                st.markdown(f"**रोल नंबर:** {target_student['Roll_No']}")
+                st.markdown(f"**स्कॉलर / दाखिला क्र.:** {target_student['Scholar_No']}")
+                st.markdown(f"**कक्षा व वर्ग:** {v_class} - {target_student.get('Section','A')}")
+                st.markdown(f"**जाति वर्ग (Category):** {target_student['Category']}")
+                st.markdown(f"**माध्यम (Medium):** {target_student.get('Medium','Hindi')}")
+
+            st.markdown(f"**समग्र आईडी (Samagra ID):** `{target_student.get('SSSM_ID','--')}` | **आधार नंबर:** `{target_student.get('Aadhar_No','--')}`")
+            st.markdown(f"**उपस्थिति स्थिति:** {'🟢 उपस्थित (Present)' if t_ev.get('status','Present')=='Present' else '🔴 अनुपस्थित (Absent)'}")
+
+        st.divider()
+
+        # 2. Attendance
+        st.markdown("#### 📅 उपस्थिति रिकॉर्ड (Attendance Summary)")
+        att_c1, att_c2, att_c3 = st.columns(3)
+        att_c1.metric("स्कूल कुल कार्य दिवस", f"{target_student.get('Total_Days', 220)} दिन")
+        att_c2.metric("विद्यार्थी उपस्थिति दिन", f"{target_student.get('Attended_Days', 204)} दिन")
+        att_pct_val = round((target_student.get('Attended_Days', 204) / max(1, target_student.get('Total_Days', 220))) * 100, 1)
+        att_c3.metric("उपस्थिति प्रतिशत", f"{att_pct_val}%")
+
+        v_att_df = v_cls_data.get("monthly_attendance", pd.DataFrame())
+        if not v_att_df.empty and cur_sel_roll in v_att_df["Roll_No"].values:
+            st.caption("**माहवार उपस्थिति विवरण (Month-by-Month Days):**")
+            st_att_row = v_att_df[v_att_df["Roll_No"] == cur_sel_roll].iloc[0]
+            m_cols_show = st.columns(12)
+            for m_idx, m_name in enumerate(MONTHS_LIST):
+                with m_cols_show[m_idx]:
+                    st.markdown(f"<div style='border: 1px solid #ccc; text-align: center; padding: 2px; font-size: 11px; background: #fff;'><b>{m_name}</b><br>{st_att_row.get(m_name, 0)}</div>", unsafe_allow_html=True)
+
+        st.divider()
+
+        # 3. Academic Marks
+        st.markdown(f"#### 📚 मुख्य विषय परीक्षा परिणाम (Academic Evaluation — {v_class})")
+        if not t_marks:
+            st.warning("⚠️ इस छात्र के मुख्य विषयों के परीक्षा अंक अभी दर्ज नहीं किए गए हैं।")
+        else:
+            exam_table_rows = []
+            tot_hy = 0
+            tot_yr = 0
+            tot_all = 0
+            all_p = True
+
+            for sub in v_subjects:
+                s_id = sub["id"]
+                s_name = sub["name"]
+                se = t_marks.get(s_id, {})
+                hy = se.get("half_yearly", 32)
+                yr = se.get("annual", 48)
+                t_sub = se.get("total", hy + yr)
+                g_sub = se.get("grade", calculate_grade(t_sub))
+                
+                tot_hy += hy
+                tot_yr += yr
+                tot_all += t_sub
+                if t_sub < 33: all_p = False
+
+                exam_table_rows.append({
+                    "विषय (Subject)": s_name,
+                    "अर्धवार्षिक हाजिरी": se.get("status_hy", "Present"),
+                    "अर्धवार्षिक प्राप्तांक [40]": hy,
+                    "वार्षिक हाजिरी": se.get("status_yr", "Present"),
+                    "वार्षिक प्राप्तांक [60]": yr,
+                    "कुल प्राप्तांक [100]": t_sub,
+                    "ग्रेड (Grade)": g_sub
+                })
+
+            st.dataframe(pd.DataFrame(exam_table_rows), use_container_width=True)
+
+            tot_pct = round((tot_all / v_max_total) * 100, 1) if v_max_total else 0
+            final_grd = calculate_grade(tot_pct)
+            is_passed = (all_p and tot_pct >= 33 and t_ev.get("status","Present") != "Absent")
+
+            sum_col1, sum_col2, sum_col3, sum_col4, sum_col5 = st.columns(5)
+            sum_col1.metric("कुल पूर्णांक", f"{v_max_total}")
+            sum_col2.metric("कुल प्राप्तांक", f"{tot_all}")
+            sum_col3.metric("प्रतिशत", f"{tot_pct}%")
+            sum_col4.metric("अंतिम ग्रेड", f"{final_grd}")
+            sum_col5.metric("परीक्षा फल", f"{'PASS' if is_passed else 'FAIL'}")
+
+        st.divider()
+
+        # 4. Co-Curricular & Social
+        c_act1, c_act2 = st.columns(2)
+        with c_act1:
+            st.markdown("#### 🎨 सह-शैक्षिक गतिविधियां (Co-Curricular - 5 क्षेत्र)")
+            co_d = t_ev.get("co_curricular", {})
+            co_show_rows = [{"गतिविधि / कौशल (Activity)": label.split("(")[0].strip(), "ग्रेड (Grade)": co_d.get(k, "A")} for k, label in CO_CURRICULAR_ACTIVITIES]
+            st.dataframe(pd.DataFrame(co_show_rows), use_container_width=True)
+
+        with c_act2:
+            st.markdown("#### 🤝 व्यक्तिगत एवं सामाजिक गुण (Social Activities - 10 गुण)")
+            soc_d = t_ev.get("social", {})
+            soc_show_rows = []
+            for k, label in SOCIAL_ACTIVITIES:
+                clean_name = label.split("(")[0].strip()
+                if "ENVIRONMENTAL" in clean_name: clean_name = "ENVIRONMENTAL CONS."
+                soc_show_rows.append({"गुण / विशेषता (Quality)": clean_name, "ग्रेड (Grade)": soc_d.get(k, "A")})
+            st.dataframe(pd.DataFrame(soc_show_rows), use_container_width=True)
+
+
+# ----------------- MODULE 6: PRINT MARKSHEET (EXACT REPLICA)
 elif menu == T["nav_marksheet"]:
     students_df = cls_data["students"]
     if students_df.empty:
@@ -1535,7 +1843,7 @@ elif menu == T["nav_marksheet"]:
 
         render_html(exact_card_html)
 
-# ----------------- MODULE 6: A3 ANNUAL RESULT SHEET (EXACT REPLICA: image_fde76c.png) -----------------
+# ----------------- MODULE 7: A3 ANNUAL RESULT SHEET (EXACT REPLICA: image_fde76c.png) -----------------
 elif menu == T["nav_a3_result"]:
     students_df = cls_data["students"]
     s_info = st.session_state.school_info
@@ -1852,7 +2160,7 @@ elif menu == T["nav_a3_result"]:
     render_html(exact_a3_html)
 
 
-# ----------------- MODULE 7: CATEGORY/GRADE WISE RESULT SUMMARY (IMAGE 3: image_aabe70.png) -----------------
+# ----------------- MODULE 8: CATEGORY/GRADE WISE RESULT SUMMARY (IMAGE 3: image_aabe70.png) -----------------
 elif menu == T["nav_summary"]:
     students_df = cls_data["students"]
     s_info = st.session_state.school_info
@@ -2095,7 +2403,7 @@ elif menu == T["nav_summary"]:
 
     render_html(summary_page_html)
 
-# ----------------- MODULE 8: SESSION CHANGE & PROMOTION -----------------
+# ----------------- MODULE 9: SESSION CHANGE & PROMOTION -----------------
 elif menu == T["nav_promote"]:
     st.markdown(f'<div class="main-header">🔄 सत्र परिवर्तन एवं कक्षा पदोन्नति (Session Promotion)</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-header">नया शैक्षणिक सत्र प्रारंभ होने पर सभी उत्तीर्ण विद्यार्थियों को स्वतः अगली कक्षा में प्रमोट करें</div>', unsafe_allow_html=True)
