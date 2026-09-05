@@ -13,6 +13,200 @@ st.set_page_config(
 )
 
 DATA_FILE = "school_data_store.json"
+
+# ----------------- HTML RENDERING HELPER (PREVENTS MARKDOWN CODE-BLOCK TRAP) -----------------
+def render_html(html_str, *args, **kwargs):
+    """Strips leading indentation from every line so Markdown never treats HTML as an indented code block"""
+    clean_html = "\n".join([line.strip() for line in html_str.splitlines() if line.strip()])
+    if hasattr(st, "html"):
+        st.html(clean_html)
+    else:
+        st.markdown(clean_html, unsafe_allow_html=True)
+
+
+# ----------------- DATA EXPORT HELPERS (EXCEL & CSV FOR RSKMP & MPBSE) -----------------
+def export_dataframe_bytes(df, file_format):
+    """Exports dataframe to Excel bytes (.xlsx) or CSV bytes (.csv) with openpyxl fallback"""
+    if file_format == "Excel (.xlsx)":
+        try:
+            buf = BytesIO()
+            with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+                df.to_excel(writer, index=False)
+            return buf.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".xlsx"
+        except Exception:
+            pass
+    csv_bytes = df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+    return csv_bytes, "text/csv", ".csv"
+
+def generate_rskmp_df(students_df, evaluations, cls_subjects, school_info, selected_class):
+    """Generates official RSKMP (rskmp.in) portal bulk upload template"""
+    rows = []
+    for idx, s in students_df.iterrows():
+        r = s["Roll_No"]
+        ev = evaluations.get(r, {})
+        m_dict = ev.get("marks", {})
+        row = {
+            "DISE_CODE": school_info.get("udise", ""),
+            "ACADEMIC_SESSION": school_info.get("session", "2023-24"),
+            "CLASS": selected_class,
+            "SAMAGRA_ID": s.get("SSSM_ID", ""),
+            "SCHOLAR_NO": s.get("Scholar_No", ""),
+            "ROLL_NO": r,
+            "STUDENT_NAME": s.get("Name", ""),
+            "FATHER_NAME": s.get("Father_Name", ""),
+            "MOTHER_NAME": s.get("Mother_Name", ""),
+            "DOB": s.get("DOB", ""),
+            "GENDER": s.get("Gender", ""),
+            "CATEGORY": s.get("Category", ""),
+            "MEDIUM": s.get("Medium", "Hindi"),
+            "EXAM_STATUS": ev.get("status", s.get("Status", "Present"))
+        }
+        tot_m = 0
+        all_pass = True
+        for sub in cls_subjects:
+            s_id = sub["id"]
+            s_name = sub["name"]
+            se = m_dict.get(s_id, {})
+            h = se.get("half_yearly", 32)
+            a = se.get("annual", 48)
+            t = se.get("total", h + a)
+            tot_m += t
+            if t < 33: all_pass = False
+            row[f"{s_name}_HalfYearly_40"] = h
+            row[f"{s_name}_Annual_60"] = a
+            row[f"{s_name}_Total_100"] = t
+            row[f"{s_name}_Grade"] = se.get("grade", calculate_grade(t))
+        
+        row["GRAND_TOTAL"] = tot_m
+        row["MAX_MARKS"] = len(cls_subjects) * 100
+        row["PERCENTAGE"] = round((tot_m / (len(cls_subjects)*100))*100, 1) if cls_subjects else 0
+        row["RESULT"] = "PASS" if (all_pass and row["PERCENTAGE"] >= 33 and row["EXAM_STATUS"] != "Absent") else "FAIL"
+        
+        # Co-Curricular
+        co = ev.get("co_curricular", {})
+        for k, _ in CO_CURRICULAR_ACTIVITIES:
+            row[k] = co.get(k, "A")
+            
+        # Social
+        soc = ev.get("social", {})
+        for k, _ in SOCIAL_ACTIVITIES:
+            row[k] = soc.get(k, "A")
+            
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+def generate_mpbse_df(students_df, evaluations, cls_subjects, school_info, selected_class):
+    """Generates official MPBSE (mpbse.nic.in / MP Online) board upload template"""
+    rows = []
+    for idx, s in students_df.iterrows():
+        r = s["Roll_No"]
+        ev = evaluations.get(r, {})
+        m_dict = ev.get("marks", {})
+        row = {
+            "SCHOOL_DISE": school_info.get("udise", ""),
+            "ACADEMIC_YEAR": school_info.get("session", "2023-24"),
+            "CLASS": selected_class,
+            "ROLL_NO": r,
+            "SCHOLAR_NO": s.get("Scholar_No", ""),
+            "STUDENT_NAME": s.get("Name", ""),
+            "FATHER_NAME": s.get("Father_Name", ""),
+            "MOTHER_NAME": s.get("Mother_Name", ""),
+            "DOB": s.get("DOB", ""),
+            "GENDER": s.get("Gender", ""),
+            "CATEGORY": s.get("Category", ""),
+            "MEDIUM": s.get("Medium", "Hindi")
+        }
+        tot_m = 0
+        all_pass = True
+        for i, sub in enumerate(cls_subjects, 1):
+            s_id = sub["id"]
+            se = m_dict.get(s_id, {})
+            t = se.get("total", 75)
+            tot_m += t
+            if t < 33: all_pass = False
+            row[f"SUB{i}_{sub['name']}_MARKS"] = t
+            row[f"SUB{i}_GRADE"] = se.get("grade", calculate_grade(t))
+        
+        row["TOTAL_MARKS"] = tot_m
+        row["MAX_MARKS"] = len(cls_subjects) * 100
+        row["PERCENTAGE"] = round((tot_m / (len(cls_subjects)*100))*100, 1) if cls_subjects else 0
+        row["RESULT"] = "PASS" if (all_pass and row["PERCENTAGE"] >= 33) else "FAIL"
+        row["DIVISION"] = calculate_division(row["PERCENTAGE"])
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+def generate_master_44col_df(students_df, evaluations, cls_subjects, school_info, selected_class):
+    """Generates the exact 44-column master tabulation sheet matching Capture 5.PNG / image_fde76c.png"""
+    rows = []
+    for idx, s in students_df.iterrows():
+        r = s["Roll_No"]
+        ev = evaluations.get(r, {})
+        m_dict = ev.get("marks", {})
+        row = {
+            "1_Sr_No": idx + 1,
+            "2_Roll_No": r,
+            "3_Scholar_No": s.get("Scholar_No", ""),
+            "4_Student_Name": s.get("Name", ""),
+            "5_Mother_Name": s.get("Mother_Name", ""),
+            "6_Father_Name": s.get("Father_Name", ""),
+            "7_DOB": s.get("DOB", ""),
+            "8_Gender": s.get("Gender", ""),
+            "9_Category": s.get("Category", ""),
+            "10_Samagra_ID": s.get("SSSM_ID", ""),
+            "11_Aadhar_No": s.get("Aadhar_No", "")
+        }
+        # Half Yearly (12, 13, 14...)
+        for i, sub in enumerate(cls_subjects):
+            s_eval = m_dict.get(sub["id"], {})
+            row[f"{12+i}_HY_{sub['name']}"] = s_eval.get("half_yearly", 32)
+        # Annual (16, 17, 18...)
+        for i, sub in enumerate(cls_subjects):
+            s_eval = m_dict.get(sub["id"], {})
+            row[f"{16+i}_Annual_{sub['name']}"] = s_eval.get("annual", 48)
+        # Final Assessment (20, 21, 22...)
+        tot_m = 0
+        all_pass = True
+        for i, sub in enumerate(cls_subjects):
+            s_eval = m_dict.get(sub["id"], {})
+            t = s_eval.get("total", 80)
+            tot_m += t
+            if t < 33: all_pass = False
+            row[f"{20+i}_Final_{sub['name']}"] = t
+            
+        pct = round((tot_m / (len(cls_subjects)*100))*100, 1) if cls_subjects else 0
+        is_pass = (all_pass and pct >= 33)
+        
+        row["24_Total_Obtained"] = tot_m
+        row["25_Result"] = "Pass" if is_pass else "Fail"
+        row["26_Percentage"] = f"{pct}%"
+        row["27_Grade"] = calculate_grade(pct)
+        row["28_Rank"] = idx + 1
+        row["29_Attendance"] = f"{s.get('Attended_Days', 200)}/{s.get('Total_Days', 220)}"
+        
+        # Co-Curricular (30 to 34)
+        co = ev.get("co_curricular", {})
+        row["30_LITERARY_SKILLS"] = co.get("LITERARY_SKILLS", "A")
+        row["31_SCIENTIFIC_SKILLS"] = co.get("SCIENTIFIC_SKILLS", "A")
+        row["32_CULTURAL_SKILLS"] = co.get("CULTURAL_SKILLS", "A")
+        row["33_CREATIVITY"] = co.get("CREATIVITY", "A")
+        row["34_SPORTS"] = co.get("SPORTS", "A")
+        
+        # Social (35 to 44)
+        soc = ev.get("social", {})
+        row["35_REGULARITY"] = soc.get("REGULARITY", "A")
+        row["36_PUNCTUALITY"] = soc.get("PUNCTUALITY", "A")
+        row["37_CLEANLINESS"] = soc.get("CLEANLINESS", "A")
+        row["38_DISCIPLINE"] = soc.get("DISCIPLINE", "A")
+        row["39_COOPERATION"] = soc.get("COOPERATION", "A")
+        row["40_ENV_CONS"] = soc.get("ENV_CONSCIOUSNESS", "A")
+        row["41_LEADERSHIP"] = soc.get("LEADERSHIP", "B")
+        row["42_TRUTHFULNESS"] = soc.get("TRUTHFULNESS", "A")
+        row["43_HONESTY"] = soc.get("HONESTY", "A")
+        row["44_EXPRESSIVE"] = soc.get("EXPRESSIVE", "C")
+        
+        rows.append(row)
+    return pd.DataFrame(rows)
+
 TODAY_STR = datetime.now().strftime("%d %B %Y")
 
 # ----------------- CUSTOM CSS FOR BEAUTIFUL UI & PRINTING (A4 & A3) -----------------
@@ -66,6 +260,47 @@ st.markdown("""
         border: 1px solid #000;
         padding: 3px 2px;
     }
+    
+    .v-th {
+        writing-mode: vertical-rl;
+        transform: rotate(180deg);
+        white-space: nowrap;
+        text-align: left;
+        height: 125px;
+        padding: 4px 1px !important;
+        font-size: 10px;
+        font-weight: bold;
+        vertical-align: bottom !important;
+        width: 26px;
+        min-width: 25px;
+        max-width: 28px;
+        border: 1px solid #000;
+    }
+    .v-th-tall {
+        writing-mode: vertical-rl;
+        transform: rotate(180deg);
+        white-space: nowrap;
+        text-align: left;
+        height: 165px;
+        padding: 4px 1px !important;
+        font-size: 10px;
+        font-weight: bold;
+        vertical-align: bottom !important;
+        width: 26px;
+        min-width: 25px;
+        max-width: 28px;
+        border: 1px solid #000;
+    }
+    .a3-box {
+        background: #ffffff;
+        border: 2px solid #000;
+        padding: 8px 10px;
+        font-family: Arial, sans-serif;
+        color: #000;
+        width: 100%;
+        overflow-x: auto;
+    }
+
     .a3-table th {
         background-color: #f8fafc;
         font-weight: bold;
@@ -518,9 +753,14 @@ if menu == T["nav_school"]:
 # ----------------- MODULE 2: STUDENT MASTER -----------------
 elif menu == T["nav_student"]:
     st.markdown(f'<div class="main-header">👨‍🎓 विद्यार्थी मास्टर डेटा — {selected_class}</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="sub-header">छात्रों का व्यक्तिगत विवरण दर्ज करें, संपादन करें या शाला छोड़ने पर टीसी जारी करें</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="sub-header">छात्रों का व्यक्तिगत विवरण, फोटो अपलोड व संपादन करें या टीसी जारी करें</div>', unsafe_allow_html=True)
 
-    tab1, tab2, tab3 = st.tabs(["📋 छात्र सूची एवं संपादन (Data Grid)", "➕ नया छात्र जोड़ें (Add Student)", "🗑️ छात्र हटाएं / टीसी (TC) जारी करें"])
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "📋 छात्र सूची एवं संपादन (Data Grid)", 
+        "➕ नया छात्र जोड़ें (Add Student)", 
+        "📸 छात्र फोटो अपलोड एवं प्रबंधन (Photo Manager)", 
+        "🗑️ छात्र हटाएं / टीसी (TC) जारी करें"
+    ])
 
     with tab1:
         st.write(f"वर्तमान में **{len(cls_data['students'])}** छात्र पंजीकृत हैं:")
@@ -584,7 +824,7 @@ elif menu == T["nav_student"]:
             with c_bot3:
                 s_att_days = st.number_input("Attended Days:", value=200)
 
-            photo_file = st.file_uploader("Photo (Optional):", type=["jpg", "jpeg", "png"])
+            photo_file = st.file_uploader("विद्यार्थी का फोटो (Photo Upload - Optional):", type=["jpg", "jpeg", "png"], key="reg_photo")
             submit_student = st.form_submit_button("➕ विद्यार्थी जोड़ें (Submit)", type="primary")
 
             if submit_student:
@@ -608,6 +848,63 @@ elif menu == T["nav_student"]:
                     st.rerun()
 
     with tab3:
+        st.subheader("📸 छात्र फोटो अपलोड एवं प्रबंधन (Upload Student Photos)")
+        st.caption("यहाँ से आप किसी भी पंजीकृत छात्र का फोटो अपलोड कर सकते हैं, जो सीधे प्रगति पत्रक (Marksheet) पर प्रिंट होगा:")
+        
+        students_df = cls_data["students"]
+        if students_df.empty:
+            st.warning("⚠️ कृपया पहले छात्र पंजीकृत करें!")
+        else:
+            col_p_left, col_p_right = st.columns([2, 1])
+            
+            with col_p_left:
+                st.markdown("#### 👤 एकल छात्र फोटो अपलोड (Single Photo Upload)")
+                st_photo_names = [f"Roll {s['Roll_No']}: {s['Name']}" for _, s in students_df.iterrows()]
+                sel_st_photo_str = st.selectbox("विद्यार्थी चुनें (Select Student):", st_photo_names, key="photo_sel_st")
+                p_roll = int(sel_st_photo_str.split(":")[0].replace("Roll", "").strip())
+                
+                target_st = students_df[students_df["Roll_No"] == p_roll].iloc[0]
+                new_photo = st.file_uploader(f"रोल नंबर {p_roll} ({target_st['Name']}) का फोटो चुनें (JPG/PNG):", type=["jpg", "jpeg", "png"], key=f"photo_up_{p_roll}")
+                
+                if st.button("💾 यह फोटो सुरक्षित करें (Save Photo)", type="primary", key=f"btn_save_photo_{p_roll}"):
+                    if new_photo:
+                        b64_img = base64.b64encode(new_photo.read()).decode()
+                        cls_data["students"].loc[cls_data["students"]["Roll_No"] == p_roll, "Photo_b64"] = b64_img
+                        save_data_to_disk()
+                        st.success(f"✅ रोल नंबर {p_roll} ({target_st['Name']}) का फोटो सफलतापूर्वक अपडेट हो गया!")
+                        st.rerun()
+                    else:
+                        st.warning("कृपया पहले फोटो फ़ाइल चुनें!")
+
+            with col_p_right:
+                st.markdown("#### 🖼️ वर्तमान फोटो (Preview)")
+                if target_st.get("Photo_b64"):
+                    st.image(base64.b64decode(target_st["Photo_b64"]), width=140, caption=f"Roll {p_roll}: {target_st['Name']}")
+                else:
+                    st.markdown('<div style="width: 130px; height: 160px; border: 2px dashed #999; display: flex; align-items: center; justify-content: center; text-align: center; color: #777; font-size: 13px; border-radius: 6px; background: #f8fafc;">फोटो उपलब्ध<br>नहीं है</div>', unsafe_allow_html=True)
+
+            st.divider()
+            st.markdown("#### 📦 बल्क फोटो अपलोड (Bulk Photos by Roll Number)")
+            st.info("💡 **टिप:** यदि आपके पास सभी छात्रों के फोटो हैं, तो फ़ाइलों का नाम छात्र के रोल नंबर के अनुसार रखें (जैसे `101.jpg`, `102.png`, `103.jpeg`) और यहाँ एक साथ अपलोड करें:")
+            bulk_files = st.file_uploader("सभी फोटो एक साथ चुनें (Multiple Files Allowed):", type=["jpg", "jpeg", "png"], accept_multiple_files=True, key="bulk_photos")
+            
+            if bulk_files and st.button("🚀 सभी फोटो एक साथ असाइन करें (Assign Bulk Photos)", type="primary"):
+                assigned_count = 0
+                for bf in bulk_files:
+                    # extract roll number from filename (e.g. 101.jpg -> 101)
+                    fname = os.path.splitext(bf.name)[0].strip()
+                    m = re.search(r'(\d+)', fname)
+                    if m:
+                        r_found = int(m.group(1))
+                        if r_found in cls_data["students"]["Roll_No"].values:
+                            b64_f = base64.b64encode(bf.read()).decode()
+                            cls_data["students"].loc[cls_data["students"]["Roll_No"] == r_found, "Photo_b64"] = b64_f
+                            assigned_count += 1
+                save_data_to_disk()
+                st.success(f"🎉 बधाई! कुल {assigned_count} छात्रों के फोटो सफलतापूर्वक असाइन व सुरक्षित कर लिए गए!")
+                st.rerun()
+
+    with tab4:
         st.subheader("🗑️ छात्र हटाएं / स्थानांतरण प्रमाण पत्र (TC) जारी करें")
         st.info("यदि कोई विद्यार्थी शाला छोड़ता है या टीसी (TC) लेता है तो उसका रोल नंबर चुनकर रिकॉर्ड हटाएं:")
         
@@ -698,6 +995,26 @@ elif menu == T["nav_attendance"]:
             save_data_to_disk()
             st.success(f"✅ कक्षा {selected_class} की माहवार उपस्थिति सफलतापूर्वक सुरक्षित कर ली गई एवं मास्टर रिकॉर्ड में अपडेट हो गई!")
 
+        # Step 3: Export Attendance Sheet
+        st.divider()
+        st.markdown("### 📥 उपस्थिति डेटा एक्सपोर्ट (Export Attendance Register)")
+        c_att_exp1, c_att_exp2, c_att_exp3 = st.columns([2, 2, 2])
+        with c_att_exp1:
+            att_fmt = st.selectbox("फ़ाइल प्रारूप चुनें (Format):", ["Excel (.xlsx)", "CSV (.csv)"], key="att_exp_fmt")
+        with c_att_exp2:
+            att_export_df = edited_att.copy()
+            att_bytes, att_mime, att_ext = export_dataframe_bytes(att_export_df, att_fmt)
+            att_filename = f"Attendance_{selected_class}_{st.session_state.school_info.get('session','2023-24')}{att_ext}"
+            st.download_button(
+                f"📥 उपस्थिति पत्रक डाउनलोड करें ({att_fmt})",
+                data=att_bytes,
+                file_name=att_filename,
+                mime=att_mime,
+                type="primary",
+                use_container_width=True
+            )
+
+
 # ----------------- MODULE 4: EVALUATION ENTRY (SUBJECT-WISE PRESENT/ABSENT) -----------------
 elif menu == T["nav_eval"]:
     st.markdown(f'<div class="main-header">📝 परीक्षा एवं गतिविधि मूल्यांकन — {selected_class}</div>', unsafe_allow_html=True)
@@ -733,7 +1050,7 @@ elif menu == T["nav_eval"]:
         else:
             photo_prev = '<div style="width: 80px; height: 95px; border: 1px dashed #93C5FD; display: flex; align-items: center; justify-content: center; font-size: 11px; text-align: center; color: #1E3A8A; background: #fff; border-radius: 6px;">पासपोर्ट फोटो</div>'
 
-        st.markdown(f"""
+        profile_card_html = f"""
         <div class="profile-card">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div style="width: 85%;">
@@ -755,7 +1072,8 @@ elif menu == T["nav_eval"]:
                 <div>{photo_prev}</div>
             </div>
         </div>
-        """, unsafe_allow_html=True)
+        """
+        render_html(profile_card_html)
 
         # Overall Status
         col_st1, col_st2 = st.columns([1, 3])
@@ -868,12 +1186,13 @@ elif menu == T["nav_marksheet"]:
             sel_student_str = st.selectbox("विद्यार्थी / रोल नंबर चुनें:", st_names)
             sel_roll = int(sel_student_str.split(":")[0].replace("Roll", "").strip())
         with c_top2:
-            st.markdown(f"""
+            top_roll_box_html = f"""
             <div style="border: 2px solid #000; padding: 6px 12px; background: #fff; text-align: center; margin-top: 18px;">
                 <span style="font-size: 13px; font-weight: bold; margin-right: 10px;">Enter Student Roll Number:</span>
                 <span style="color: red; font-size: 18px; font-weight: 800;">{sel_roll}</span>
             </div>
-            """, unsafe_allow_html=True)
+            """
+            render_html(top_roll_box_html)
         with c_top3:
             st.markdown("<div style='margin-top: 22px;'>", unsafe_allow_html=True)
             st.button("🖨️ Print", on_click=None, use_container_width=True)
@@ -977,9 +1296,9 @@ elif menu == T["nav_marksheet"]:
         for k, label in CO_CURRICULAR_ACTIVITIES:
             g_val = cocurr_dict.get(k, "A")
             cocurr_rows_html += f"""
-            <tr>
-                <td style="border: 1px solid #000; text-align: left; padding: 3px 5px; font-weight: bold; font-size: 11px;">▸ {label.split("(")[0].strip()}</td>
-                <td style="border: 1px solid #000; text-align: center; padding: 3px 5px; font-weight: bold; font-size: 11px;">{g_val}</td>
+            <tr style="height: 25px;">
+                <td style="border: 1px solid #000; text-align: left; padding: 2px 5px; font-weight: bold; font-size: 10px; white-space: nowrap;">▸ {label.split("(")[0].strip()}</td>
+                <td style="border: 1px solid #000; text-align: center; padding: 2px; font-weight: bold; font-size: 11px;">{g_val}</td>
             </tr>
             """
 
@@ -990,12 +1309,16 @@ elif menu == T["nav_marksheet"]:
             k2, l2 = SOCIAL_ACTIVITIES[i+5]
             g1 = social_dict.get(k1, "A")
             g2 = social_dict.get(k2, "A")
+            name1 = l1.split("(")[0].strip()
+            name2 = l2.split("(")[0].strip()
+            if "ENVIRONMENTAL" in name2:
+                name2 = "ENVIRONMENTAL CONS."
             soc_rows_html += f"""
-            <tr>
-                <td style="border: 1px solid #000; text-align: left; padding: 3px 5px; font-weight: bold; font-size: 11px;">▸ {l1.split("(")[0].strip()}</td>
-                <td style="border: 1px solid #000; text-align: center; padding: 3px 5px; font-weight: bold; font-size: 11px;">{g1}</td>
-                <td style="border: 1px solid #000; text-align: left; padding: 3px 5px; font-weight: bold; font-size: 11px;">▸ {l2.split("(")[0].strip()}</td>
-                <td style="border: 1px solid #000; text-align: center; padding: 3px 5px; font-weight: bold; font-size: 11px;">{g2}</td>
+            <tr style="height: 26px;">
+                <td style="border: 1px solid #000; text-align: left; padding: 2px 6px; font-weight: bold; font-size: 10px; white-space: nowrap; width: 38%;">▸ {name1}</td>
+                <td style="border: 1px solid #000; text-align: center; padding: 2px; font-weight: bold; font-size: 11px; width: 12%;">{g1}</td>
+                <td style="border: 1px solid #000; text-align: left; padding: 2px 6px; font-weight: bold; font-size: 9.5px; white-space: nowrap; width: 38%;">▸ {name2}</td>
+                <td style="border: 1px solid #000; text-align: center; padding: 2px; font-weight: bold; font-size: 11px; width: 12%;">{g2}</td>
             </tr>
             """
 
@@ -1111,22 +1434,28 @@ elif menu == T["nav_marksheet"]:
 
             <table style="width: 100%; border-collapse: collapse; border: none; margin-bottom: 8px;">
                 <tr>
-                    <td style="width: 38%; vertical-align: top; padding-right: 6px;">
-                        <table style="width: 100%; border-collapse: collapse; border: 1px solid #000;">
+                    <td style="width: 33%; vertical-align: top; padding-right: 6px;">
+                        <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; table-layout: fixed;">
                             <thead>
-                                <tr style="background-color: #FDEBD0;">
-                                    <th style="border: 1px solid #000; text-align: left; padding: 4px 6px; font-size: 11px;">Co-Curricular Activities</th>
-                                    <th style="border: 1px solid #000; width: 25%; font-size: 11px; padding: 4px;">Grade</th>
+                                <tr style="background-color: #FDEBD0; height: 28px;">
+                                    <th style="border: 1px solid #000; text-align: left; padding: 2px 4px; font-size: 11px; width: 75%;">Co-Curricular Activities</th>
+                                    <th style="border: 1px solid #000; text-align: center; padding: 2px; font-size: 11px; width: 25%;">Grade</th>
                                 </tr>
                             </thead>
                             <tbody>{cocurr_rows_html}</tbody>
                         </table>
                     </td>
-                    <td style="width: 62%; vertical-align: top; padding-left: 6px;">
-                        <table style="width: 100%; border-collapse: collapse; border: 1px solid #000;">
+                    <td style="width: 67%; vertical-align: top; padding-left: 6px;">
+                        <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; table-layout: fixed;">
+                            <colgroup>
+                                <col style="width: 38%;">
+                                <col style="width: 12%;">
+                                <col style="width: 38%;">
+                                <col style="width: 12%;">
+                            </colgroup>
                             <thead>
-                                <tr style="background-color: #FDEBD0;">
-                                    <th colspan="4" style="border: 1px solid #000; text-align: center; padding: 4px 6px; font-size: 11px;">Social Activities</th>
+                                <tr style="background-color: #FDEBD0; height: 28px;">
+                                    <th colspan="4" style="border: 1px solid #000; text-align: center; padding: 2px 4px; font-size: 11px;">Social Activities</th>
                                 </tr>
                             </thead>
                             <tbody>{soc_rows_html}</tbody>
@@ -1184,9 +1513,29 @@ elif menu == T["nav_marksheet"]:
             </div>
         </div>
         """
-        st.markdown(exact_card_html, unsafe_allow_html=True)
+        
+        # Export Marksheets Summary for all students
+        st.markdown("### 📥 सभी छात्रों का परीक्षाफल डेटा एक्सपोर्ट (Export All Results)")
+        c_mexp1, c_mexp2 = st.columns([2, 2])
+        with c_mexp1:
+            m_exp_fmt = st.selectbox("प्रारूप चुनें (File Format):", ["Excel (.xlsx)", "CSV (.csv)"], key="m_exp_fmt")
+        with c_mexp2:
+            m_master_df = generate_master_44col_df(students_df, cls_data["evaluations"], cls_subjects, s_info, selected_class)
+            m_bytes, m_mime, m_ext = export_dataframe_bytes(m_master_df, m_exp_fmt)
+            m_filename = f"Result_Marksheets_{selected_class}_{s_info.get('session','2023-24')}{m_ext}"
+            st.download_button(
+                f"📥 संपूर्ण परीक्षाफल तालिका डाउनलोड करें ({m_exp_fmt})",
+                data=m_bytes,
+                file_name=m_filename,
+                mime=m_mime,
+                type="primary",
+                use_container_width=True
+            )
+        st.divider()
 
-# ----------------- MODULE 6: A3 ANNUAL RESULT SHEET (IMAGE 2: image_aab7a9.png) -----------------
+        render_html(exact_card_html)
+
+# ----------------- MODULE 6: A3 ANNUAL RESULT SHEET (EXACT REPLICA: image_fde76c.png) -----------------
 elif menu == T["nav_a3_result"]:
     students_df = cls_data["students"]
     s_info = st.session_state.school_info
@@ -1194,13 +1543,64 @@ elif menu == T["nav_a3_result"]:
     sub_count = len(cls_subjects)
     max_total = sub_count * 100
 
-    c_a3_1, c_a3_2 = st.columns([3, 1])
-    with c_a3_1:
-        st.markdown('<div style="color: red; font-weight: bold; font-size: 15px;">*इस परीक्षाफल पत्रक को अनुमोदन हेतु A-3 साइज़ के पेपर पर प्रिंट करें</div>', unsafe_allow_html=True)
-    with c_a3_2:
-        st.button("🖨️ Print A3 Sheet", on_click=None, use_container_width=True)
+    
+    # ----------------- PORTAL EXPORT CENTER (RSKMP, MPBSE, MASTER GAZETTE) -----------------
+    with st.expander("📥 सरकारी पोर्टल एवं परीक्षाफल एक्सपोर्ट केंद्र (Export for RSKMP / MPBSE / Excel)", expanded=True):
+        st.info("💡 **पोर्टल अपलोड निर्देश:** यहाँ से आप सीधे **RSKMP (rskmp.in)** और **MPBSE (mpbse.nic.in)** के आधिकारिक एक्सेल/सीएसवी प्रारूप में डेटा डाउनलोड कर सकते हैं जिसे सीधे पोर्टल पर बल्क अपलोड किया जा सकता है:")
+        
+        col_p_type, col_p_file, col_p_btn = st.columns([3, 2, 3])
+        with col_p_type:
+            export_portal_type = st.selectbox(
+                "1. एक्सपोर्ट प्रारूप चुनें (Choose Export Template):",
+                [
+                    "🏛️ RSKMP पोर्टल प्रारूप (rskmp.in Upload Template - Class 1 to 8)",
+                    "🏢 MPBSE बोर्ड पोर्टल प्रारूप (mpbse.nic.in / MP Online Format)",
+                    "📋 संपूर्ण 44-कॉलम शालेय गोशवारा (44-Column Master Tabulation Gazette)"
+                ],
+                key="exp_portal_choice"
+            )
+        with col_p_file:
+            export_file_format = st.selectbox(
+                "2. फ़ाइल एक्सटेंशन (File Format):",
+                ["Excel (.xlsx)", "CSV (.csv)"],
+                key="exp_file_ext_choice"
+            )
+        with col_p_btn:
+            st.markdown("<div style='margin-top: 28px;'>", unsafe_allow_html=True)
+            if "RSKMP" in export_portal_type:
+                target_df = generate_rskmp_df(students_df, cls_data["evaluations"], cls_subjects, s_info, selected_class)
+                f_prefix = f"RSKMP_Upload_{selected_class}_{s_info.get('session','2023-24')}"
+            elif "MPBSE" in export_portal_type:
+                target_df = generate_mpbse_df(students_df, cls_data["evaluations"], cls_subjects, s_info, selected_class)
+                f_prefix = f"MPBSE_Board_{selected_class}_{s_info.get('session','2023-24')}"
+            else:
+                target_df = generate_master_44col_df(students_df, cls_data["evaluations"], cls_subjects, s_info, selected_class)
+                f_prefix = f"Master_Gazette_A3_{selected_class}_{s_info.get('session','2023-24')}"
+                
+            p_bytes, p_mime, p_ext = export_dataframe_bytes(target_df, export_file_format)
+            st.download_button(
+                label=f"🚀 डेटा डाउनलोड करें ({export_file_format})",
+                data=p_bytes,
+                file_name=f"{f_prefix}{p_ext}",
+                mime=p_mime,
+                type="primary",
+                use_container_width=True
+            )
+            st.markdown("</div>", unsafe_allow_html=True)
+    st.divider()
 
-    # Compute summaries for top boxes
+    # Top Notice and Print Button matching image_fde76c.png / image_fdd8e5.png
+    c_a3_top1, c_a3_top2 = st.columns([3, 1])
+    with c_a3_top1:
+        st.markdown('''
+        <div style="border: 2px solid #008000; padding: 6px 14px; background: #fff; display: inline-block;">
+            <span style="color: #CC0000; font-weight: 800; font-size: 14px;">*इस परीक्षाफल पत्रक को अनुमोदन हेतु A-3 साइज़ के पेपर पर प्रिंट करें</span>
+        </div>
+        ''', unsafe_allow_html=True)
+    with c_a3_top2:
+        st.button("🖨️ Print", on_click=None, use_container_width=True)
+
+    # Compute Summary Stats for top right boxes
     enrolled_cnt = len(students_df)
     appeared_cnt = 0
     absent_cnt = 0
@@ -1208,7 +1608,7 @@ elif menu == T["nav_a3_result"]:
     fail_cnt = 0
     grade_counts = {"A+": 0, "A": 0, "B+": 0, "B": 0, "C+": 0, "C": 0, "D": 0, "E": 0}
 
-    # Student rows for A3 Table
+    # Generate Student Rows for A3 Sheet
     student_rows_a3 = ""
     for idx, s in students_df.iterrows():
         r_no = s["Roll_No"]
@@ -1236,85 +1636,108 @@ elif menu == T["nav_a3_result"]:
             tot_obt += sub_tot
             if sub_tot < 33: all_passed = False
 
-            hy_cells += f"<td>{hy_val}</td>"
-            yr_cells += f"<td>{yr_val}</td>"
-            fn_cells += f"<td><b>{sub_tot}</b></td>"
+            hy_cells += f'<td style="border: 1px solid #000; padding: 2px;">{hy_val}</td>'
+            yr_cells += f'<td style="border: 1px solid #000; padding: 2px;">{yr_val}</td>'
+            fn_cells += f'<td style="border: 1px solid #000; padding: 2px; font-weight: bold; color: green;">{sub_tot}</td>'
 
         pct = round((tot_obt / max_total) * 100, 1) if max_total else 0
         grd = calculate_grade(pct)
         is_pass = (all_passed and pct >= 33 and st_status != "Absent")
         res_str = "Pass" if is_pass else "Fail"
+        res_color = "#008000" if is_pass else "#CC0000"
+        
         if is_pass: pass_cnt += 1
         else: fail_cnt += 1
 
         if grd in grade_counts: grade_counts[grd] += 1
 
-        # Co-Curricular
         co_dict = ev.get("co_curricular", {})
-        co_tds = "".join([f"<td>{co_dict.get(k, 'A')}</td>" for k, _ in CO_CURRICULAR_ACTIVITIES])
+        co_tds = "".join([f'<td style="border: 1px solid #000; padding: 2px; font-weight: bold;">{co_dict.get(k, "A")}</td>' for k, _ in CO_CURRICULAR_ACTIVITIES])
 
-        # Social
         soc_dict = ev.get("social", {})
-        soc_tds = "".join([f"<td>{soc_dict.get(k, 'A')}</td>" for k, _ in SOCIAL_ACTIVITIES])
+        soc_tds = "".join([f'<td style="border: 1px solid #000; padding: 2px; font-weight: bold;">{soc_dict.get(k, "A")}</td>' for k, _ in SOCIAL_ACTIVITIES])
 
-        student_rows_a3 += f"""
-        <tr>
-            <td>{idx+1}</td>
-            <td>{r_no}</td>
-            <td>{s['Scholar_No']}</td>
-            <td style="text-align: left; font-weight: bold; white-space: nowrap;">{s['Name']}</td>
-            <td style="text-align: left;">{s['Mother_Name']}</td>
-            <td style="text-align: left;">{s['Father_Name']}</td>
-            <td>{s['DOB']}</td>
-            <td>{s['Gender']}</td>
-            <td>{s['Category']}</td>
-            <td>{s['SSSM_ID']}</td>
-            <td>{s.get('Aadhar_No','')}</td>
+        student_rows_a3 += f'''
+        <tr style="height: 26px; font-size: 11px;">
+            <td style="border: 1px solid #000; padding: 2px;">{idx+1}</td>
+            <td style="border: 1px solid #000; padding: 2px; font-weight: bold;">{r_no}</td>
+            <td style="border: 1px solid #000; padding: 2px;">{s['Scholar_No']}</td>
+            <td style="border: 1px solid #000; text-align: left; padding: 2px 5px; font-weight: bold; white-space: nowrap;">{s['Name']}</td>
+            <td style="border: 1px solid #000; text-align: left; padding: 2px 5px; white-space: nowrap;">{s['Mother_Name']}</td>
+            <td style="border: 1px solid #000; text-align: left; padding: 2px 5px; white-space: nowrap;">{s['Father_Name']}</td>
+            <td style="border: 1px solid #000; padding: 2px; white-space: nowrap;">{s['DOB']}</td>
+            <td style="border: 1px solid #000; padding: 2px;">{s['Gender']}</td>
+            <td style="border: 1px solid #000; padding: 2px;">{s['Category']}</td>
+            <td style="border: 1px solid #000; padding: 2px;">{s['SSSM_ID']}</td>
+            <td style="border: 1px solid #000; padding: 2px;">{s.get('Aadhar_No','')}</td>
             {hy_cells}
             {yr_cells}
             {fn_cells}
-            <td style="font-weight: bold; color: #008000;">{tot_obt}</td>
-            <td style="font-weight: bold; color: {'#008000' if res_str=='Pass' else '#CC0000'};">{res_str}</td>
-            <td>{pct}%</td>
-            <td style="font-weight: bold;">{grd}</td>
-            <td>{idx+1}</td>
-            <td>{s.get('Attended_Days', 200)}/{s.get('Total_Days', 220)}</td>
+            <td style="border: 1px solid #000; padding: 2px; font-weight: bold; color: green;">{tot_obt}</td>
+            <td style="border: 1px solid #000; padding: 2px; font-weight: bold; color: {res_color};">{res_str}</td>
+            <td style="border: 1px solid #000; padding: 2px; font-weight: bold; color: green;">{pct}%</td>
+            <td style="border: 1px solid #000; padding: 2px; font-weight: bold;">{grd}</td>
+            <td style="border: 1px solid #000; padding: 2px; font-weight: bold;">{idx+1}</td>
+            <td style="border: 1px solid #000; padding: 2px; font-size: 10px;">{s.get('Attended_Days', 200)}/{s.get('Total_Days', 220)}</td>
             {co_tds}
             {soc_tds}
         </tr>
-        """
+        '''
 
-    # Exact Header HTML matching image_aab7a9.png
-    a3_html = f"""
-    <div class="printable-area" style="background: #fff; border: 2px solid #000; padding: 10px; font-family: Arial, sans-serif; width: 100%;">
-        <div style="font-size: 22px; font-weight: 900; text-align: left; margin-bottom: 6px; letter-spacing: 0.5px;">
+    # Build Header Columns & Row Numbers list matching image_fde76c.png exactly
+    col_num_cells = ""
+    for c_i in range(1, 12):
+        col_num_cells += f'<td style="border: 1px solid #000; font-size: 10px; font-weight: bold; padding: 1px; background: #ebdcd0;">{c_i}</td>'
+    for c_i in range(sub_count):
+        col_num_cells += f'<td style="border: 1px solid #000; font-size: 10px; font-weight: bold; padding: 1px; background: #ebdcd0;">{12 + c_i}</td>'
+    for c_i in range(sub_count):
+        col_num_cells += f'<td style="border: 1px solid #000; font-size: 10px; font-weight: bold; padding: 1px; background: #ebdcd0;">{16 + c_i}</td>'
+    for c_i in range(sub_count):
+        col_num_cells += f'<td style="border: 1px solid #000; font-size: 10px; font-weight: bold; padding: 1px; background: #ebdcd0;">{20 + c_i}</td>'
+    for c_i in range(24, 30):
+        col_num_cells += f'<td style="border: 1px solid #000; font-size: 10px; font-weight: bold; padding: 1px; background: #ebdcd0;">{c_i}</td>'
+    for c_i in range(30, 35):
+        col_num_cells += f'<td style="border: 1px solid #000; font-size: 10px; font-weight: bold; padding: 1px; background: #ebdcd0;">{c_i}</td>'
+    for c_i in range(35, 45):
+        col_num_cells += f'<td style="border: 1px solid #000; font-size: 10px; font-weight: bold; padding: 1px; background: #ebdcd0;">{c_i}</td>'
+
+    sub_th_hy = "".join([f'<th rowspan="2" class="v-th-tall">{s["name"]}</th>' for s in cls_subjects])
+    sub_th_yr = "".join([f'<th rowspan="2" class="v-th-tall">{s["name"]}</th>' for s in cls_subjects])
+    sub_th_fn = "".join([f'<th rowspan="2" class="v-th-tall">{s["name"]}</th>' for s in cls_subjects])
+
+    exact_a3_html = f'''
+    <div class="printable-area a3-box">
+        <!-- TITLE -->
+        <div style="font-size: 24px; font-weight: 900; text-align: left; margin-bottom: 8px; letter-spacing: 0.5px;">
             ANNUAL RESULT SHEET {s_info.get('session', '2023-24')}
         </div>
 
-        <table style="width: 100%; border-collapse: collapse; margin-bottom: 8px;">
+        <!-- TOP SUMMARY BLOCK MATCHING image_fde7cf.png -->
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 6px;">
             <tr>
-                <td style="width: 50%; vertical-align: top;">
+                <td style="width: 52%; vertical-align: top;">
                     <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; font-size: 11px;">
-                        <tr><td colspan="4" style="border: 1px solid #000; padding: 3px 6px;"><b>Name Of School:</b> {s_info.get('name','')}</td></tr>
+                        <tr><td colspan="5" style="border: 1px solid #000; padding: 3px 6px; font-weight: bold;">Name Of School: {s_info.get('name','')}</td></tr>
                         <tr>
-                            <td style="border: 1px solid #000; padding: 3px 6px;"><b>Dise Code:</b> {s_info.get('udise','')}</td>
-                            <td style="border: 1px solid #000; padding: 3px 6px;"><b>Class:</b> {selected_class}</td>
-                            <td style="border: 1px solid #000; padding: 3px 6px;"><b>Medium:</b> {s_info.get('medium','Hindi')}</td>
-                            <td style="border: 1px solid #000; padding: 3px 6px;"><b>Block:</b> {s_info.get('block','')} | <b>Dist:</b> {s_info.get('district','')}</td>
+                            <td style="border: 1px solid #000; padding: 3px 6px;"><b>Dise Code :</b> {s_info.get('udise','')}</td>
+                            <td style="border: 1px solid #000; padding: 3px 6px;"><b>Class :</b> {selected_class}</td>
+                            <td style="border: 1px solid #000; padding: 3px 6px;"><b>Medium :</b> {s_info.get('medium','Hindi')}</td>
+                            <td style="border: 1px solid #000; padding: 3px 6px;"><b>Block :</b> {s_info.get('block','')}</td>
+                            <td style="border: 1px solid #000; padding: 3px 6px;"><b>District :</b> {s_info.get('district','')}</td>
                         </tr>
                     </table>
                 </td>
-                <td style="width: 25%; vertical-align: top; padding: 0 4px;">
+                <td style="width: 24%; vertical-align: top; padding: 0 4px;">
                     <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; font-size: 11px; text-align: center;">
-                        <tr style="background: #f8fafc;"><th colspan="5" style="border: 1px solid #000; padding: 2px;">Students Wise Summary</th></tr>
-                        <tr style="font-weight: bold; background: #fff;">
+                        <tr style="background: #d9d9d9;"><th colspan="5" style="border: 1px solid #000; padding: 2px;">Students Wise Summary</th></tr>
+                        <tr style="font-weight: bold; font-size: 10px; background: #fff;">
                             <td style="border: 1px solid #000; padding: 2px;">Enrolled</td>
                             <td style="border: 1px solid #000; padding: 2px;">Appeared</td>
                             <td style="border: 1px solid #000; padding: 2px;">Absent</td>
                             <td style="border: 1px solid #000; padding: 2px;">Pass</td>
                             <td style="border: 1px solid #000; padding: 2px;">Fail</td>
                         </tr>
-                        <tr style="font-weight: bold; font-size: 12px;">
+                        <tr style="font-weight: bold; font-size: 12px; background: #fff;">
                             <td style="border: 1px solid #000; padding: 2px;">{enrolled_cnt}</td>
                             <td style="border: 1px solid #000; padding: 2px;">{appeared_cnt}</td>
                             <td style="border: 1px solid #000; padding: 2px;">{absent_cnt}</td>
@@ -1323,16 +1746,16 @@ elif menu == T["nav_a3_result"]:
                         </tr>
                     </table>
                 </td>
-                <td style="width: 25%; vertical-align: top;">
+                <td style="width: 24%; vertical-align: top;">
                     <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; font-size: 11px; text-align: center;">
-                        <tr style="background: #f8fafc;"><th colspan="8" style="border: 1px solid #000; padding: 2px;">Grade Wise Result Summary</th></tr>
-                        <tr style="font-weight: bold;">
+                        <tr style="background: #d9d9d9;"><th colspan="8" style="border: 1px solid #000; padding: 2px;">Grade Wise Result Summary</th></tr>
+                        <tr style="font-weight: bold; font-size: 10px; background: #fff;">
                             <td style="border: 1px solid #000; padding: 2px;">A+</td><td style="border: 1px solid #000; padding: 2px;">A</td>
                             <td style="border: 1px solid #000; padding: 2px;">B+</td><td style="border: 1px solid #000; padding: 2px;">B</td>
                             <td style="border: 1px solid #000; padding: 2px;">C+</td><td style="border: 1px solid #000; padding: 2px;">C</td>
                             <td style="border: 1px solid #000; padding: 2px;">D</td><td style="border: 1px solid #000; padding: 2px;">E</td>
                         </tr>
-                        <tr style="font-weight: bold; font-size: 12px;">
+                        <tr style="font-weight: bold; font-size: 12px; background: #fff;">
                             <td style="border: 1px solid #000; padding: 2px;">{grade_counts['A+']}</td>
                             <td style="border: 1px solid #000; padding: 2px;">{grade_counts['A']}</td>
                             <td style="border: 1px solid #000; padding: 2px;">{grade_counts['B+']}</td>
@@ -1347,41 +1770,77 @@ elif menu == T["nav_a3_result"]:
             </tr>
         </table>
 
-        <!-- A3 MASTER TABULATION TABLE -->
-        <table class="a3-table">
+        <!-- A3 MASTER 44-COLUMN TABULATION TABLE MATCHING image_fde76c.png EXACTLY -->
+        <table class="a3-table" style="width: 100%; border-collapse: collapse; border: 1px solid #000; font-size: 10.5px; text-align: center;">
             <thead>
-                <tr>
-                    <th rowspan="2">Sr.No.</th>
-                    <th rowspan="2">Roll No.</th>
-                    <th rowspan="2">Scholar No.</th>
-                    <th rowspan="2">Name Of Student</th>
-                    <th rowspan="2">Mother's Name</th>
-                    <th rowspan="2">Father's Name</th>
-                    <th rowspan="2">Date Of Birth</th>
-                    <th rowspan="2">Gender</th>
-                    <th rowspan="2">Category</th>
-                    <th rowspan="2">Samagra ID</th>
-                    <th rowspan="2">Aadhar No.</th>
-                    <th colspan="{sub_count}">Half Yearly Evaluation (Max 40)</th>
-                    <th colspan="{sub_count}">Annual Evaluation (Max 60)</th>
-                    <th colspan="{sub_count}">Final Assessment (Max 100)</th>
-                    <th colspan="6">Final Result</th>
-                    <th colspan="5">Co-Curricular Activities</th>
-                    <th colspan="10">SOCIAL ACTIVITIES</th>
+                <!-- ROW 1: TOP LEVEL HEADERS -->
+                <tr style="background: #fff; font-weight: bold; text-align: center;">
+                    <th rowspan="3" class="v-th-tall">Sr.No.</th>
+                    <th rowspan="3" class="v-th-tall">Roll No.</th>
+                    <th rowspan="3" class="v-th-tall">Scholar No.</th>
+                    <th rowspan="3" style="border: 1px solid #000; min-width: 140px; vertical-align: middle;">Name Of Student</th>
+                    <th rowspan="3" style="border: 1px solid #000; min-width: 120px; vertical-align: middle;">Mother's Name</th>
+                    <th rowspan="3" style="border: 1px solid #000; min-width: 120px; vertical-align: middle;">Father's Name</th>
+                    <th rowspan="3" style="border: 1px solid #000; min-width: 85px; vertical-align: middle;">Date Of Birth</th>
+                    <th rowspan="3" class="v-th-tall">Gender</th>
+                    <th rowspan="3" class="v-th-tall">Category</th>
+                    <th rowspan="3" class="v-th-tall">Samagra ID</th>
+                    <th rowspan="3" style="border: 1px solid #000; min-width: 90px; vertical-align: middle; padding: 3px;">Aadhar No.</th>
+                    
+                    <th colspan="{sub_count}" style="border: 1px solid #000; padding: 2px 4px; font-size: 10px; height: 38px; vertical-align: middle;">Half Yearly<br>Evaluation<br>[Max. Marks - 40]</th>
+                    <th colspan="{sub_count}" style="border: 1px solid #000; padding: 2px 4px; font-size: 10px; height: 38px; vertical-align: middle;">Annual<br>Evaluation<br>[Max. Marks - 60]</th>
+                    <th colspan="{sub_count}" style="border: 1px solid #000; padding: 2px 4px; font-size: 10px; height: 38px; vertical-align: middle;">Final<br>Assessment<br>[Half + Annual]</th>
+                    <th style="border: 1px solid #000; width: 28px; padding: 2px; font-size: 9.5px; height: 38px; vertical-align: middle;">Max.<br>{max_total}</th>
+                    
+                    <!-- GIANT FINAL RESULT SUPER-HEADER SPANNING COLS 25 TO 44 MATCHING image_fde76c.png -->
+                    <th colspan="20" style="border: 1px solid #000; padding: 6px; font-size: 16px; font-weight: 900; letter-spacing: 0.5px; height: 38px; vertical-align: middle;">Final Result</th>
                 </tr>
-                <tr>
-                    {"".join([f"<th>{s['name'].split()[0]}</th>" for s in cls_subjects])}
-                    {"".join([f"<th>{s['name'].split()[0]}</th>" for s in cls_subjects])}
-                    {"".join([f"<th>{s['name'].split()[0]}</th>" for s in cls_subjects])}
-                    <th>Total ({max_total})</th>
-                    <th>Result</th>
-                    <th>Percentage</th>
-                    <th>Grade</th>
-                    <th>Rank</th>
-                    <th>Attendance</th>
-                    <th>LITERARY</th><th>SCIENTIFIC</th><th>CULTURAL</th><th>CREATIVITY</th><th>SPORTS</th>
-                    <th>REGULARITY</th><th>PUNCTUALITY</th><th>CLEANLINESS</th><th>DISCIPLINE</th><th>CO-OPERATION</th>
-                    <th>ENV.</th><th>LEADERSHIP</th><th>TRUTHFULNESS</th><th>HONESTY</th><th>EXPRESIVE</th>
+                
+                <!-- ROW 2: SUB-HEADERS (Notice: Result, Percentage, Grade, Rank, Attendance have rowspan=2 with tall blank space above) -->
+                <tr style="background: #fff; font-weight: bold; text-align: center;">
+                    {sub_th_hy}
+                    {sub_th_yr}
+                    {sub_th_fn}
+                    <th rowspan="2" class="v-th-tall">Total Obtained</th>
+                    
+                    <!-- Under Final Result: Cols 25 to 29 (Row 2+3 merged with vertical-align: bottom) -->
+                    <th rowspan="2" class="v-th-tall">Result</th>
+                    <th rowspan="2" class="v-th-tall">Percentage</th>
+                    <th rowspan="2" class="v-th-tall">Grade</th>
+                    <th rowspan="2" class="v-th-tall">Rank</th>
+                    <th rowspan="2" class="v-th-tall">Attendance</th>
+                    
+                    <!-- Under Final Result: Co-curricular header (Cols 30-34) -->
+                    <th colspan="5" style="border: 1px solid #000; padding: 4px; font-size: 11px; font-weight: bold; height: 35px; vertical-align: middle;">Co-Curricular<br>Activities</th>
+                    <!-- Under Final Result: Social Activities header (Cols 35-44) -->
+                    <th colspan="10" style="border: 1px solid #000; padding: 4px; font-size: 11px; font-weight: bold; height: 35px; vertical-align: middle;">SOCIAL ACTIVITES</th>
+                </tr>
+                
+                <!-- ROW 3: VERTICAL SUB-HEADERS FOR CO-CURRICULAR & SOCIAL (Cols 30 to 44) -->
+                <tr style="background: #fff; font-weight: bold; text-align: center;">
+                    <!-- Co-Curricular items (Row 3 only) -->
+                    <th class="v-th">LITERARY SKILLS</th>
+                    <th class="v-th">SCIENTIFIC SKILLS</th>
+                    <th class="v-th">CULTURAL SKILLS</th>
+                    <th class="v-th">CREATIVITY</th>
+                    <th class="v-th">SPORTS</th>
+                    
+                    <!-- Social Activities items (Row 3 only) -->
+                    <th class="v-th">REGULARITY</th>
+                    <th class="v-th">PUNCTUALITY</th>
+                    <th class="v-th">CLEANLINESS</th>
+                    <th class="v-th">DISCIPLINE</th>
+                    <th class="v-th">CO-OPERATION</th>
+                    <th class="v-th">ENVIRONMENTAL CONS.</th>
+                    <th class="v-th">LEADERSHIP QUALITIES</th>
+                    <th class="v-th">TRUTHFULNESS</th>
+                    <th class="v-th">HONESTY</th>
+                    <th class="v-th">EXPRESIVE</th>
+                </tr>
+                
+                <!-- ROW 4: NUMBERS ROW (1 TO 44) WITH LIGHT TAN/PEACH BACKGROUND (#ebdcd0) -->
+                <tr class="a3-num-row" style="text-align: center; font-weight: bold; height: 22px;">
+                    {col_num_cells}
                 </tr>
             </thead>
             <tbody>
@@ -1389,8 +1848,9 @@ elif menu == T["nav_a3_result"]:
             </tbody>
         </table>
     </div>
-    """
-    st.markdown(a3_html, unsafe_allow_html=True)
+    '''
+    render_html(exact_a3_html)
+
 
 # ----------------- MODULE 7: CATEGORY/GRADE WISE RESULT SUMMARY (IMAGE 3: image_aabe70.png) -----------------
 elif menu == T["nav_summary"]:
@@ -1598,7 +2058,42 @@ elif menu == T["nav_summary"]:
         </div>
     </div>
     """
-    st.markdown(summary_page_html, unsafe_allow_html=True)
+    
+    # Export Summary Tables for Department Submissions
+    st.markdown("### 📥 सांख्यिकी सारांश एक्सपोर्ट (Export Result Summary for BEO / BRC / DEO Office)")
+    c_sexp1, c_sexp2 = st.columns([2, 2])
+    with c_sexp1:
+        s_exp_fmt = st.selectbox("फ़ाइल प्रारूप चुनें (Format):", ["Excel (.xlsx)", "CSV (.csv)"], key="sum_exp_fmt")
+    with c_sexp2:
+        # Build tabular dataframe of category stats
+        sum_rows = []
+        for m in summary_metrics:
+            r_dict = {"Summary_Metric": m}
+            for g in ["Girls", "Boys", "Grand Total"]:
+                for c in ["SC", "ST", "OBC", "GEN", "Total"]:
+                    col_k = "ALL" if c == "Total" else c
+                    g_k = "ALL" if g == "Grand Total" else g
+                    if m == "Percentage":
+                        pas = get_cnt(g_k, col_k, "Pass")
+                        app = get_cnt(g_k, col_k, "Appeared")
+                        val = f"{round((pas/max(1,app))*100)}%"
+                    else:
+                        val = get_cnt(g_k, col_k, m)
+                    r_dict[f"{g}_{c}"] = val
+            sum_rows.append(r_dict)
+        sum_df = pd.DataFrame(sum_rows)
+        s_bytes, s_mime, s_ext = export_dataframe_bytes(sum_df, s_exp_fmt)
+        st.download_button(
+            f"📥 सांख्यिकी सारांश डाउनलोड करें ({s_exp_fmt})",
+            data=s_bytes,
+            file_name=f"Result_Summary_Statistics_{selected_class}_{s_info.get('session','2023-24')}{s_ext}",
+            mime=s_mime,
+            type="primary",
+            use_container_width=True
+        )
+    st.divider()
+
+    render_html(summary_page_html)
 
 # ----------------- MODULE 8: SESSION CHANGE & PROMOTION -----------------
 elif menu == T["nav_promote"]:
