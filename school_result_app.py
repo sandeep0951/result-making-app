@@ -24,6 +24,98 @@ def render_html(html_str, *args, **kwargs):
         st.markdown(clean_html, unsafe_allow_html=True)
 
 
+
+# ----------------- GOVT TEMPLATE SCANNER & MULTI-PRESET RULE ENGINE -----------------
+DEFAULT_EXAM_RULES = {
+    "standard_rsk": {
+        "name": "RSK मानक स्थानीय परीक्षा (40 अर्धवार्षिक + 60 वार्षिक = 100)",
+        "components": [
+            {"id": "half_yearly", "name": "अर्धवार्षिक", "max": 40, "pass": 13},
+            {"id": "annual", "name": "वार्षिक परीक्षा", "max": 60, "pass": 20}
+        ],
+        "total_max": 100
+    },
+    "board_5_8": {
+        "name": "RSKMP 5वीं व 8वीं बोर्ड (20 अर्धवार्षिक + 20 प्रोजेक्ट + 60 वार्षिक = 100)",
+        "components": [
+            {"id": "half_yearly", "name": "अर्धवार्षिक", "max": 20, "pass": 7},
+            {"id": "project", "name": "प्रोजेक्ट कार्य", "max": 20, "pass": 7},
+            {"id": "annual", "name": "वार्षिक लिखित", "max": 60, "pass": 20}
+        ],
+        "total_max": 100
+    },
+    "mpbse_highschool": {
+        "name": "MPBSE हाईस्कूल 9वीं-10वीं (75 लिखित + 25 प्रोजेक्ट = 100)",
+        "components": [
+            {"id": "theory", "name": "लिखित परीक्षा", "max": 75, "pass": 25},
+            {"id": "project", "name": "प्रोजेक्ट / प्रायोगिक", "max": 25, "pass": 8}
+        ],
+        "total_max": 100
+    }
+}
+
+def scan_govt_excel_template(file_bytes, filename):
+    """Parses any official RSKMP or MPBSE Excel/CSV template and extracts headers and components"""
+    try:
+        if filename.endswith(".csv"):
+            df = pd.read_csv(BytesIO(file_bytes))
+        else:
+            df = pd.read_excel(BytesIO(file_bytes))
+        
+        cols = [str(c).strip() for c in df.columns]
+        detected_features = []
+        has_proj = any("project" in c.lower() or "प्रोजेक्ट" in c.lower() for c in cols)
+        has_hy = any("half" in c.lower() or "अर्ध" in c.lower() or "mid" in c.lower() for c in cols)
+        has_ann = any("annual" in c.lower() or "वार्षिक" in c.lower() or "theory" in c.lower() for c in cols)
+        has_samagra = any("samagra" in c.lower() or "sssm" in c.lower() for c in cols)
+        has_roll = any("roll" in c.lower() for c in cols)
+        
+        if has_proj: detected_features.append("✅ प्रोजेक्ट कार्य (Internal Project Work) कॉलम डिटेक्ट हुआ")
+        if has_hy: detected_features.append("✅ अर्धवार्षिक परीक्षा (Half Yearly) कॉलम डिटेक्ट हुआ")
+        if has_ann: detected_features.append("✅ वार्षिक परीक्षा / थ्योरी (Annual / Theory) कॉलम डिटेक्ट हुआ")
+        if has_samagra: detected_features.append("✅ समग्र आईडी (Samagra ID) मैपिंग पहचानी गई")
+        if has_roll: detected_features.append("✅ रोल नंबर (Roll Number) कॉलम पहचाना गया")
+        
+        return {
+            "success": True,
+            "total_columns": len(cols),
+            "columns": cols,
+            "detected_features": detected_features,
+            "has_project": has_proj,
+            "has_half_yearly": has_hy,
+            "has_annual": has_ann
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+def get_session_exam_rule(session_str, cls_name="Class 7th"):
+    """Returns the applicable exam rule scoped strictly to the specified academic session"""
+    rules_store = st.session_state.get("session_exam_rules", {})
+    sess_rule = rules_store.get(session_str, {})
+    
+    clean_cls = str(cls_name).lower()
+    is_5_or_8 = ("class 5" in clean_cls or "class 8" in clean_cls or "5th" in clean_cls or "8th" in clean_cls)
+    is_9_or_10 = ("class 9" in clean_cls or "class 10" in clean_cls or "9th" in clean_cls or "10th" in clean_cls)
+    
+    if sess_rule:
+        chosen_mode = sess_rule.get("mode", "auto")
+        if chosen_mode == "board_5_8" or (chosen_mode == "auto" and is_5_or_8):
+            return DEFAULT_EXAM_RULES["board_5_8"]
+        elif chosen_mode == "mpbse_highschool" or (chosen_mode == "auto" and is_9_or_10):
+            return DEFAULT_EXAM_RULES["mpbse_highschool"]
+        elif chosen_mode == "custom" and "custom_components" in sess_rule:
+            return sess_rule["custom_components"]
+        else:
+            return DEFAULT_EXAM_RULES["standard_rsk"]
+    
+    # Default fallback
+    if is_5_or_8:
+        return DEFAULT_EXAM_RULES["board_5_8"]
+    elif is_9_or_10:
+        return DEFAULT_EXAM_RULES["mpbse_highschool"]
+    else:
+        return DEFAULT_EXAM_RULES["standard_rsk"]
+
 # ----------------- DATA EXPORT HELPERS (EXCEL & CSV FOR RSKMP & MPBSE) -----------------
 def export_dataframe_bytes(df, file_format):
     """Exports dataframe to Excel bytes (.xlsx) or CSV bytes (.csv) with openpyxl fallback"""
@@ -63,19 +155,28 @@ def generate_rskmp_df(students_df, evaluations, cls_subjects, school_info, selec
         }
         tot_m = 0
         all_pass = True
+        is_absent = (row["EXAM_STATUS"] == "Absent")
+        rule_cfg = get_session_exam_rule(school_info.get("session", "2023-24"), selected_class)
+        has_proj_comp = any(c["id"] == "project" for c in rule_cfg["components"])
+
         for sub in cls_subjects:
             s_id = sub["id"]
             s_name = sub["name"]
             se = m_dict.get(s_id, {})
             h = se.get("half_yearly", 32)
+            p = se.get("project", 16) if has_proj_comp else 0
             a = se.get("annual", 48)
-            t = se.get("total", h + a)
+            t = se.get("total", (h + p + a) if has_proj_comp else (h + a))
             tot_m += t
             if t < 33: all_pass = False
-            row[f"{s_name}_HalfYearly_40"] = h
-            row[f"{s_name}_Annual_60"] = a
-            row[f"{s_name}_Total_100"] = t
-            row[f"{s_name}_Grade"] = se.get("grade", calculate_grade(t))
+            
+            # Official RSKMP Portal Absent Code: -1
+            row[f"{s_name}_HalfYearly"] = -1 if is_absent else h
+            if has_proj_comp:
+                row[f"{s_name}_Project_20"] = -1 if is_absent else p
+            row[f"{s_name}_Annual"] = -1 if is_absent else a
+            row[f"{s_name}_Total_100"] = 0 if is_absent else t
+            row[f"{s_name}_Grade"] = "Ab" if is_absent else se.get("grade", calculate_grade(t))
         
         row["GRAND_TOTAL"] = tot_m
         row["MAX_MARKS"] = len(cls_subjects) * 100
@@ -537,6 +638,15 @@ def load_data_from_disk():
 if "ui_lang" not in st.session_state:
     st.session_state.ui_lang = "हिन्दी (Hindi)"
 
+if "session_exam_rules" not in st.session_state:
+    st.session_state.session_exam_rules = {}
+
+if "update_alert_dismissed" not in st.session_state:
+    st.session_state.update_alert_dismissed = False
+
+if "show_format_adopter_dialog" not in st.session_state:
+    st.session_state.show_format_adopter_dialog = False
+
 if "initialized" not in st.session_state:
     st.session_state.initialized = True
     st.session_state.school_info = {
@@ -702,6 +812,109 @@ for col, def_val in [("Class", selected_class), ("Section", "A"), ("Aadhar_No", 
     if col not in cls_data["students"].columns:
         cls_data["students"][col] = def_val
 
+
+# ----------------- GOVERNMENT PORTAL UPDATE MONITOR (RSKMP / MPBSE) -----------------
+current_sess = st.session_state.school_info.get('session', '2023-24')
+
+if not st.session_state.update_alert_dismissed:
+    with st.expander("🔔 **शासकीय पोर्टल अपडेट मॉनिटर (RSKMP / MPBSE Updates)**", expanded=False):
+        c_nt1, c_nt2 = st.columns([3, 1])
+        with c_nt1:
+            st.markdown(f'''
+            <div style="background: #FEF3C7; border-left: 5px solid #D97706; padding: 8px 12px; border-radius: 4px;">
+                <b style="color: #92400E; font-size: 13.5px;">📢 नवीन शासकीय प्रारूप अपडेट सूचना (सत्र {current_sess}):</b><br>
+                <span style="color: #78350F; font-size: 12.5px;">
+                    राज्य शिक्षा केंद्र (RSKMP) एवं माध्यमिक शिक्षा मण्डल (MPBSE) के नवीन मूल्यांकन दिशा-निर्देश एवं एक्सेल अपलोड प्रारूप का अपडेट डिटेक्ट हुआ है।
+                </span>
+            </div>
+            ''', unsafe_allow_html=True)
+        with c_nt2:
+            st.markdown("<div style='margin-top: 6px;'>", unsafe_allow_html=True)
+            col_b1, col_b2 = st.columns(2)
+            with col_b1:
+                if st.button("🟢 हाँ, अपनाएं", key="btn_adopt_format_yes", type="primary", use_container_width=True):
+                    st.session_state.show_format_adopter_dialog = True
+            with col_b2:
+                if st.button("⚪ बाद में", key="btn_adopt_format_no", use_container_width=True):
+                    st.session_state.update_alert_dismissed = True
+                    st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
+
+# Dialog / Box when user clicks "हाँ, अपनाएं"
+if st.session_state.get("show_format_adopter_dialog"):
+    with st.container():
+        st.markdown(f'''
+        <div style="background: #F0FDF4; border: 2px solid #16A34A; padding: 14px 18px; border-radius: 8px; margin-bottom: 15px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h4 style="color: #166534; margin: 0;">🏛️ नवीन शासकीय प्रारूप अपलोड एवं सत्र अनुकूलन (Format Adopter)</h4>
+            </div>
+            <p style="color: #14532D; font-size: 13px; margin-top: 6px;">
+                सरकारी पोर्टल (RSKMP या MPBSE) से डाउनलोड की गई नई एक्सेल शीट यहाँ अपलोड करें। ऐप स्वतः उसके कॉलम स्कैन करेगी और <b>केवल चयनित सत्र</b> के लिए नया नियम सक्रिय करेगी (पुराने सत्रों का डेटा पूर्ववत सुरक्षित रहेगा)।
+            </p>
+        </div>
+        ''', unsafe_allow_html=True)
+
+        c_link1, c_link2, c_link3 = st.columns(3)
+        c_link1.markdown("🔗 **[RSKMP पोर्टल लॉगिन (rskmp.in)](https://www.rskmp.in)**")
+        c_link2.markdown("🔗 **[MPBSE बोर्ड पोर्टल (mpbse.nic.in)](http://mpbse.nic.in)**")
+        c_link3.markdown("🔗 **[एमपी ऑनलाइन स्कूल मॉड्यूल](https://mponline.gov.in)**")
+
+        c_up_file, c_up_sess = st.columns([3, 2])
+        with c_up_file:
+            uploaded_template = st.file_uploader(
+                "📥 डाउनलोड की गई सरकारी एक्सेल फ़ाइल चुनें (.xlsx / .csv):", 
+                type=["xlsx", "csv"], 
+                key="govt_template_uploader"
+            )
+        with c_up_sess:
+            target_sess = st.selectbox(
+                "यह नया प्रारूप किस सत्र हेतु लागू करना है?",
+                [current_sess, "2024-25", "2025-26", "2026-27", "2027-28"],
+                key="target_adoption_sess"
+            )
+            sess_isolate_check = st.checkbox(
+                f"✅ पुष्टि करें कि पूर्ववर्ती सत्रों का रिकॉर्ड मूल नियम पर ही सुरक्षित रहेगा", 
+                value=True,
+                key="sess_isolate_confirm"
+            )
+
+        if uploaded_template:
+            scan_res = scan_govt_excel_template(uploaded_template.read(), uploaded_template.name)
+            if scan_res["success"]:
+                st.success(f"🎉 सरकारी टेम्पलेट सफलतापूर्वक पहचाना गया! कुल {scan_res['total_columns']} कॉलम मिले।")
+                st.write("**डिटेक्ट की गई प्रमुख विशेषताएं:**")
+                for f_item in scan_res["detected_features"]:
+                    st.caption(f_item)
+                
+                c_act_save, c_act_close = st.columns([2, 1])
+                with c_act_save:
+                    if st.button(f"💾 सत्र {target_sess} हेतु नया प्रारूप सक्रिय करें", type="primary", use_container_width=True):
+                        # Save session rule strictly to target session
+                        if target_sess not in st.session_state.session_exam_rules:
+                            st.session_state.session_exam_rules[target_sess] = {}
+                        
+                        st.session_state.session_exam_rules[target_sess] = {
+                            "adopted_from_file": uploaded_template.name,
+                            "mode": "board_5_8" if scan_res.get("has_project") else "standard_rsk",
+                            "columns": scan_res["columns"]
+                        }
+                        save_data_to_disk()
+                        st.balloons()
+                        st.success(f"✅ नवीन प्रारूप सफलतापूर्वक केवल सत्र {target_sess} हेतु सक्रिय कर दिया गया! पूर्ववर्ती सत्र सुरक्षित हैं।")
+                        st.session_state.show_format_adopter_dialog = False
+                        st.rerun()
+                with c_act_close:
+                    if st.button("❌ बंद करें (Close)", use_container_width=True):
+                        st.session_state.show_format_adopter_dialog = False
+                        st.rerun()
+            else:
+                st.error(f"फ़ाइल स्कैन में त्रुटि: {scan_res.get('error')}")
+        else:
+            if st.button("❌ अभी रद्द करें (Cancel)"):
+                st.session_state.show_format_adopter_dialog = False
+                st.rerun()
+    st.divider()
+
 # ----------------- MODULE 1: SCHOOL SETUP -----------------
 if menu == T["nav_school"]:
     st.markdown(f'<div class="main-header">🏫 स्कूल प्रोफाइल एवं संस्था विवरण</div>', unsafe_allow_html=True)
@@ -753,6 +966,43 @@ if menu == T["nav_school"]:
             st.session_state.school_info["sign_b64"] = base64.b64encode(sign_file.read()).decode()
             save_data_to_disk()
             st.success("हस्ताक्षर सुरक्षित!")
+
+
+        st.divider()
+        st.subheader("⚙️ परीक्षा घटक व पूर्णांक प्रबंधन (Exam Components & Marks Master)")
+        st.caption("सत्र अनुसार शासकीय मूल्यांकन प्रारूप चुनें या 5वीं/8वीं बोर्ड हेतु प्रोजेक्ट कार्य सक्रिय करें:")
+        
+        cur_sess_for_rule = st.session_state.school_info.get("session", "2023-24")
+        cur_rule = get_session_exam_rule(cur_sess_for_rule, selected_class)
+        
+        c_pat1, c_pat2 = st.columns([2, 1])
+        with c_pat1:
+            pat_choice = st.selectbox(
+                f"सत्र {cur_sess_for_rule} का सक्रिय शासकीय परीक्षा पैटर्न:",
+                [
+                    "1. RSK मानक स्थानीय परीक्षा (40 अर्धवार्षिक + 60 वार्षिक = 100)",
+                    "2. RSKMP 5वीं व 8वीं बोर्ड (20 अर्धवार्षिक + 20 प्रोजेक्ट + 60 वार्षिक = 100)",
+                    "3. MPBSE हाईस्कूल 9वीं-10वीं (75 लिखित + 25 प्रोजेक्ट = 100)"
+                ],
+                key="school_setup_pat_choice"
+            )
+        with c_pat2:
+            st.markdown("<div style='margin-top: 28px;'>", unsafe_allow_html=True)
+            if st.button("💾 यह पैटर्न सक्रिय करें", type="primary", key="btn_save_pattern"):
+                if cur_sess_for_rule not in st.session_state.session_exam_rules:
+                    st.session_state.session_exam_rules[cur_sess_for_rule] = {}
+                
+                if "5वीं व 8वीं" in pat_choice:
+                    st.session_state.session_exam_rules[cur_sess_for_rule]["mode"] = "board_5_8"
+                elif "MPBSE" in pat_choice:
+                    st.session_state.session_exam_rules[cur_sess_for_rule]["mode"] = "mpbse_highschool"
+                else:
+                    st.session_state.session_exam_rules[cur_sess_for_rule]["mode"] = "standard_rsk"
+                save_data_to_disk()
+                st.success(f"✅ सत्र {cur_sess_for_rule} के लिए पैटर्न सफलतापूर्वक सहेजा गया!")
+                st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
+
 
 # ----------------- MODULE 2: STUDENT MASTER -----------------
 elif menu == T["nav_student"]:
@@ -1086,18 +1336,32 @@ elif menu == T["nav_eval"]:
                                              index=0 if eval_data.get("status", "Present") == "Present" else 1)
             eval_data["status"] = st_overall_status
 
-        # 1. Main Subjects (With Subject-Wise Present/Absent!)
-        with st.expander(f"📚 1. मुख्य विषय अंक प्रविष्टि (विषयवार Present/Absent सहित)", expanded=True):
-            st.info(f"💡 {selected_class} के विषय: अर्धवार्षिक (पूर्णांक 40, उत्तीर्णांक 13) | वार्षिक (पूर्णांक 60, उत्तीर्णांक 20) | कुल 100")
-            
-            sub_head = st.columns([3, 2, 2, 2, 2, 2, 2])
-            sub_head[0].markdown("**विषय (Subject)**")
-            sub_head[1].markdown("**अर्धवार्षिक हाजिरी**")
-            sub_head[2].markdown("**अर्धवार्षिक [40]**")
-            sub_head[3].markdown("**वार्षिक हाजिरी**")
-            sub_head[4].markdown("**वार्षिक [60]**")
-            sub_head[5].markdown("**कुल प्राप्तांक [100]**")
-            sub_head[6].markdown("**ग्रेड (Grade)**")
+        # 1. Main Subjects (With Subject-Wise Present/Absent & Dynamic Component Pattern!)
+        cur_exam_rule = get_session_exam_rule(st.session_state.school_info.get("session", "2023-24"), selected_class)
+        has_proj_m4 = any(c["id"] == "project" for c in cur_exam_rule["components"])
+
+        with st.expander(f"📚 1. मुख्य विषय अंक प्रविष्टि ({cur_exam_rule['name']})", expanded=True):
+            if has_proj_m4:
+                st.info(f"💡 **सक्रिय बोर्ड पैटर्न ({selected_class}):** अर्धवार्षिक [20] + प्रोजेक्ट कार्य [20] + वार्षिक लिखित [60] = कुल 100")
+                sub_head = st.columns([3, 2, 2, 2, 2, 2, 2, 2])
+                sub_head[0].markdown("**विषय (Subject)**")
+                sub_head[1].markdown("**अर्धवार्षिक हाजिरी**")
+                sub_head[2].markdown("**अर्धवार्षिक [20]**")
+                sub_head[3].markdown("**प्रोजेक्ट [20]**")
+                sub_head[4].markdown("**वार्षिक हाजिरी**")
+                sub_head[5].markdown("**वार्षिक [60]**")
+                sub_head[6].markdown("**कुल [100]**")
+                sub_head[7].markdown("**ग्रेड**")
+            else:
+                st.info(f"💡 **सक्रिय पैटर्न ({selected_class}):** अर्धवार्षिक (पूर्णांक 40, उत्तीर्णांक 13) | वार्षिक (पूर्णांक 60, उत्तीर्णांक 20) | कुल 100")
+                sub_head = st.columns([3, 2, 2, 2, 2, 2, 2])
+                sub_head[0].markdown("**विषय (Subject)**")
+                sub_head[1].markdown("**अर्धवार्षिक हाजिरी**")
+                sub_head[2].markdown("**अर्धवार्षिक [40]**")
+                sub_head[3].markdown("**वार्षिक हाजिरी**")
+                sub_head[4].markdown("**वार्षिक [60]**")
+                sub_head[5].markdown("**कुल प्राप्तांक [100]**")
+                sub_head[6].markdown("**ग्रेड (Grade)**")
 
             updated_marks = {}
             for sub in cls_subjects:
@@ -1106,40 +1370,76 @@ elif menu == T["nav_eval"]:
                 
                 prev_sub = eval_data.get("marks", {}).get(s_id, {})
                 p_hy_stat = prev_sub.get("status_hy", "Present")
-                p_hy_val = prev_sub.get("half_yearly", 32)
+                p_hy_val = prev_sub.get("half_yearly", 16 if has_proj_m4 else 32)
+                p_proj_val = prev_sub.get("project", 18)
                 p_yr_stat = prev_sub.get("status_yr", "Present")
                 p_yr_val = prev_sub.get("annual", 48)
 
-                r_cols = st.columns([3, 2, 2, 2, 2, 2, 2])
-                with r_cols[0]:
-                    st.write(f"📖 **{s_name}**")
-                with r_cols[1]:
-                    stat_hy = st.selectbox(f"stat_hy_{s_id}", ["Present", "Absent"], index=0 if p_hy_stat == "Present" else 1, key=f"stat_hy_{sel_roll}_{s_id}", label_visibility="collapsed")
-                with r_cols[2]:
-                    val_hy = st.number_input(f"hy_{s_id}", min_value=0, max_value=40, value=0 if stat_hy == "Absent" else int(p_hy_val), disabled=(stat_hy == "Absent"), key=f"num_hy_{sel_roll}_{s_id}", label_visibility="collapsed")
-                with r_cols[3]:
-                    stat_yr = st.selectbox(f"stat_yr_{s_id}", ["Present", "Absent"], index=0 if p_yr_stat == "Present" else 1, key=f"stat_yr_{sel_roll}_{s_id}", label_visibility="collapsed")
-                with r_cols[4]:
-                    val_yr = st.number_input(f"yr_{s_id}", min_value=0, max_value=60, value=0 if stat_yr == "Absent" else int(p_yr_val), disabled=(stat_yr == "Absent"), key=f"num_yr_{sel_roll}_{s_id}", label_visibility="collapsed")
-                
-                if stat_hy == "Absent" and stat_yr == "Absent":
-                    m_tot = 0
-                    m_grd = "Ab"
+                if has_proj_m4:
+                    r_cols = st.columns([3, 2, 2, 2, 2, 2, 2, 2])
+                    with r_cols[0]:
+                        st.write(f"📖 **{s_name}**")
+                    with r_cols[1]:
+                        stat_hy = st.selectbox(f"stat_hy_{s_id}", ["Present", "Absent"], index=0 if p_hy_stat == "Present" else 1, key=f"stat_hy_{sel_roll}_{s_id}", label_visibility="collapsed")
+                    with r_cols[2]:
+                        val_hy = st.number_input(f"hy_{s_id}", min_value=0, max_value=20, value=0 if stat_hy == "Absent" else min(20, int(p_hy_val)), disabled=(stat_hy == "Absent"), key=f"num_hy_{sel_roll}_{s_id}", label_visibility="collapsed")
+                    with r_cols[3]:
+                        val_proj = st.number_input(f"proj_{s_id}", min_value=0, max_value=20, value=min(20, int(p_proj_val)), key=f"num_proj_{sel_roll}_{s_id}", label_visibility="collapsed")
+                    with r_cols[4]:
+                        stat_yr = st.selectbox(f"stat_yr_{s_id}", ["Present", "Absent"], index=0 if p_yr_stat == "Present" else 1, key=f"stat_yr_{sel_roll}_{s_id}", label_visibility="collapsed")
+                    with r_cols[5]:
+                        val_yr = st.number_input(f"yr_{s_id}", min_value=0, max_value=60, value=0 if stat_yr == "Absent" else int(p_yr_val), disabled=(stat_yr == "Absent"), key=f"num_yr_{sel_roll}_{s_id}", label_visibility="collapsed")
+                    
+                    if stat_hy == "Absent" and stat_yr == "Absent":
+                        m_tot = 0
+                        m_grd = "Ab"
+                    else:
+                        m_tot = val_hy + val_proj + val_yr
+                        m_grd = calculate_grade(m_tot)
+
+                    with r_cols[6]:
+                        st.markdown(f"<h4 style='margin:0; text-align:center; color:#1E3A8A;'>{m_tot}</h4>", unsafe_allow_html=True)
+                    with r_cols[7]:
+                        c_col = "#B91C1C" if m_grd in ["E", "Ab"] else "#008000"
+                        st.markdown(f"<h4 style='margin:0; text-align:center; color:{c_col};'>{m_grd}</h4>", unsafe_allow_html=True)
+
+                    updated_marks[s_id] = {
+                        "status_hy": stat_hy, "half_yearly": val_hy,
+                        "project": val_proj,
+                        "status_yr": stat_yr, "annual": val_yr,
+                        "total": m_tot, "grade": m_grd
+                    }
                 else:
-                    m_tot = val_hy + val_yr
-                    m_grd = calculate_grade(m_tot)
+                    r_cols = st.columns([3, 2, 2, 2, 2, 2, 2])
+                    with r_cols[0]:
+                        st.write(f"📖 **{s_name}**")
+                    with r_cols[1]:
+                        stat_hy = st.selectbox(f"stat_hy_{s_id}", ["Present", "Absent"], index=0 if p_hy_stat == "Present" else 1, key=f"stat_hy_{sel_roll}_{s_id}", label_visibility="collapsed")
+                    with r_cols[2]:
+                        val_hy = st.number_input(f"hy_{s_id}", min_value=0, max_value=40, value=0 if stat_hy == "Absent" else int(p_hy_val), disabled=(stat_hy == "Absent"), key=f"num_hy_{sel_roll}_{s_id}", label_visibility="collapsed")
+                    with r_cols[3]:
+                        stat_yr = st.selectbox(f"stat_yr_{s_id}", ["Present", "Absent"], index=0 if p_yr_stat == "Present" else 1, key=f"stat_yr_{sel_roll}_{s_id}", label_visibility="collapsed")
+                    with r_cols[4]:
+                        val_yr = st.number_input(f"yr_{s_id}", min_value=0, max_value=60, value=0 if stat_yr == "Absent" else int(p_yr_val), disabled=(stat_yr == "Absent"), key=f"num_yr_{sel_roll}_{s_id}", label_visibility="collapsed")
+                    
+                    if stat_hy == "Absent" and stat_yr == "Absent":
+                        m_tot = 0
+                        m_grd = "Ab"
+                    else:
+                        m_tot = val_hy + val_yr
+                        m_grd = calculate_grade(m_tot)
 
-                with r_cols[5]:
-                    st.markdown(f"<h4 style='margin:0; text-align:center; color:#1E3A8A;'>{m_tot}</h4>", unsafe_allow_html=True)
-                with r_cols[6]:
-                    c_col = "#B91C1C" if m_grd in ["E", "Ab"] else "#008000"
-                    st.markdown(f"<h4 style='margin:0; text-align:center; color:{c_col};'>{m_grd}</h4>", unsafe_allow_html=True)
+                    with r_cols[5]:
+                        st.markdown(f"<h4 style='margin:0; text-align:center; color:#1E3A8A;'>{m_tot}</h4>", unsafe_allow_html=True)
+                    with r_cols[6]:
+                        c_col = "#B91C1C" if m_grd in ["E", "Ab"] else "#008000"
+                        st.markdown(f"<h4 style='margin:0; text-align:center; color:{c_col};'>{m_grd}</h4>", unsafe_allow_html=True)
 
-                updated_marks[s_id] = {
-                    "status_hy": stat_hy, "half_yearly": val_hy,
-                    "status_yr": stat_yr, "annual": val_yr,
-                    "total": m_tot, "grade": m_grd
-                }
+                    updated_marks[s_id] = {
+                        "status_hy": stat_hy, "half_yearly": val_hy,
+                        "annual": val_yr, "status_yr": stat_yr,
+                        "total": m_tot, "grade": m_grd
+                    }
 
         # 2. Co-Curricular
         with st.expander("🎨 2. सह-शैक्षिक गतिविधियां मूल्यांकन (5 क्षेत्र)", expanded=False):
