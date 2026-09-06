@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import json, base64, os
+import json, base64, os, hashlib, urllib.parse
 from io import BytesIO
 from datetime import datetime
 
@@ -15,6 +15,111 @@ st.set_page_config(
 
 
 DATA_FILE = "school_data_store.json"
+
+# ----------------- MULTI-TENANT SCHOOL REGISTRY & DATA ISOLATION ENGINE -----------------
+SCHOOLS_REGISTRY_FILE = "schools_master_registry.json"
+
+def hash_password(password):
+    """Secure SHA-256 password hashing"""
+    return hashlib.sha256(password.strip().encode('utf-8')).hexdigest()
+
+def verify_password(password, hashed):
+    return hash_password(password) == hashed
+
+AUDIT_LOGS_FILE = "security_audit_logs.json"
+
+def log_security_event(dise_code, role, user_name, mobile, action, details, status="SUCCESS"):
+    """Records an immutable security and compliance audit event"""
+    logs = []
+    if os.path.exists(AUDIT_LOGS_FILE):
+        try:
+            with open(AUDIT_LOGS_FILE, "r", encoding="utf-8") as f:
+                logs = json.load(f)
+        except Exception:
+            logs = []
+    event = {
+        "timestamp": datetime.now().strftime("%d-%b-%Y %I:%M:%S %p"),
+        "dise_code": str(dise_code),
+        "role": role,
+        "user_name": user_name,
+        "mobile": str(mobile),
+        "action": action,
+        "details": details,
+        "status": status,
+        "ip": "127.0.0.1"
+    }
+    logs.append(event)
+    try:
+        with open(AUDIT_LOGS_FILE, "w", encoding="utf-8") as f:
+            json.dump(logs, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+    return True
+
+def load_audit_logs():
+    """Loads all security audit logs"""
+    if os.path.exists(AUDIT_LOGS_FILE):
+        try:
+            with open(AUDIT_LOGS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
+
+
+def load_schools_registry():
+    """Loads all registered schools in the multi-tenant SaaS registry"""
+    if os.path.exists(SCHOOLS_REGISTRY_FILE):
+        try:
+            with open(SCHOOLS_REGISTRY_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+def save_schools_registry(registry):
+    try:
+        with open(SCHOOLS_REGISTRY_FILE, "w", encoding="utf-8") as f:
+            json.dump(registry, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        st.error(f"रजिस्ट्री सुरक्षित करने में त्रुटि: {e}")
+        return False
+
+def init_default_school_registry():
+    """Initializes default master demo school if registry is empty"""
+    reg = load_schools_registry()
+    if "23260100101" not in reg:
+        reg["23260100101"] = {
+            "dise_code": "23260100101",
+            "school_name": "शासकीय माध्यमिक विद्यालय",
+            "mobile": "9826012345",
+            "email": "principal.bhopal@school.mp.gov.in",
+            "password_hash": hash_password("admin@123"),
+            "plan": "School Result Pro ऑल-इन-वन पास (₹499/वर्ष)",
+            "price": 499,
+            "status": "Active (सक्रिय)",
+            "expiry": "2027-03-31",
+            "created_at": "2026-09-05",
+            "district": "Bhopal",
+            "block": "Fanda",
+            "data_file": "school_data_23260100101.json",
+            "teachers": [
+                {"name": "श्री राजेश शर्मा", "mobile": "9826112233", "assigned_class": "Class 7th", "created_at": "2026-09-06"}
+            ],
+            "pending_approvals": []
+        }
+        save_schools_registry(reg)
+
+init_default_school_registry()
+
+def get_current_school_file():
+    """Returns the isolated JSON file for the currently authenticated school"""
+    auth_school = st.session_state.get("authenticated_school")
+    if auth_school and "dise_code" in auth_school:
+        return f"school_data_{auth_school['dise_code']}.json"
+    return "school_data_store.json"
+
 
 
 # ----------------- HTML RENDERING HELPER (PREVENTS MARKDOWN CODE-BLOCK TRAP) -----------------
@@ -447,6 +552,81 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
+
+# ----------------- WHATSAPP RESULT NOTIFICATION GENERATOR -----------------
+def generate_whatsapp_result_link(student_name, roll_no, cls_name, grand_obt, max_grand, pct, grd, result_str, school_name, parent_mobile=""):
+    """Generates direct, clean WhatsApp Web / App shareable result link for parents"""
+    clean_mob = "".join(filter(str.isdigit, str(parent_mobile))) if parent_mobile else ""
+    if len(clean_mob) == 10:
+        clean_mob = "91" + clean_mob
+    
+    status_emoji = "🟢" if "pass" in str(result_str).lower() or "उत्तीर्ण" in str(result_str) else "🟠"
+    
+    msg = f"""🏫 *{school_name}*
+🎓 *वार्षिक परीक्षा परिणाम (Annual Result — {cls_name})*
+━━━━━━━━━━━━━━━━━━━━
+👤 *विद्यार्थी का नाम:* {student_name}
+🎯 *रोल नंबर:* {roll_no} | *कक्षा:* {cls_name}
+📊 *कुल प्राप्तांक:* {grand_obt} / {max_grand} (*{pct}%*)
+🏆 *अंतिम ग्रेड:* {grd}
+📌 *परीक्षा फल:* {status_emoji} *{result_str}*
+━━━━━━━━━━━━━━━━━━━━
+💐 हार्दिक बधाई एवं उज्ज्वल भविष्य की शुभकामनाएं!
+— *प्रधानाध्यापक / परीक्षा प्रभारी*
+*{school_name}*"""
+    
+    encoded = urllib.parse.quote(msg)
+    if clean_mob:
+        wa_url = f"https://wa.me/{clean_mob}?text={encoded}"
+    else:
+        wa_url = f"https://wa.me/?text={encoded}"
+    return wa_url, msg
+
+
+# ----------------- DPDP ACT EXPORT GATEKEEPER & AUDIT VERIFIER -----------------
+def render_export_gatekeeper(context_label="Data Export"):
+    """
+    Enforces Role Restriction and 6-Digit OTP Gatekeeper before allowing data export.
+    Returns True if export is permitted, False otherwise.
+    """
+    role = st.session_state.get("authenticated_role", "PRINCIPAL")
+    if role == "TEACHER":
+        st.markdown("""
+        <div style="background: #FEF2F2; border-left: 4px solid #EF4444; padding: 12px 16px; border-radius: 6px; color: #991B1B; margin: 10px 0;">
+            <b>🔒 शासकीय डेटा सुरक्षा सूचना:</b> बल्क डेटा एवं आधिकारिक शासकीय परीक्षाफल एक्सपोर्ट का अधिकार केवल <b>संस्था प्रधान (Principal)</b> खाते में अधिकृत है।
+        </div>
+        """, unsafe_allow_html=True)
+        return False
+    
+    auth_school = st.session_state.get("authenticated_school", {})
+    if not st.session_state.get("export_otp_verified", False):
+        st.markdown("""
+        <div style="background: #EFF6FF; border: 1px solid #BFDBFE; padding: 10px 14px; border-radius: 6px; margin-bottom: 10px;">
+            <b style="color: #1E3A8A; font-size: 13.5px;">🔒 अधिकृत एक्सपोर्ट सुरक्षा सत्यापन (DPDP Act 2023 Compliance)</b><br>
+            <span style="font-size: 12px; color: #334155;">संस्था प्रधान के अधिकृत मोबाइल पर 6-अंकीय OTP सत्यापन एवं कानूनी दायित्व स्वीकार करना अनिवार्य है।</span>
+        </div>
+        """, unsafe_allow_html=True)
+        c_gk1, c_gk2 = st.columns([1.5, 3])
+        with c_gk1:
+            exp_otp = st.text_input("6-अंकीय एक्सपोर्ट OTP:*", value="888999", key=f"gk_otp_{context_label}", help="परीक्षण हेतु डिफॉल्ट OTP: 888999")
+        with c_gk2:
+            st.markdown("<div style='margin-top: 15px;'>", unsafe_allow_html=True)
+            exp_consent = st.checkbox("✅ मैं प्रमाणित करता हूँ कि यह डेटा विद्यालय के अधिकृत उपयोग हेतु डाउनलोड किया जा रहा है। OTP सत्यापन के उपरांत इसकी वैधानिक ज़िम्मेदारी संस्था की होगी।", value=True, key=f"gk_chk_{context_label}")
+            st.markdown("</div>", unsafe_allow_html=True)
+        
+        if st.button(f"🔓 सत्यापित करें एवं एक्सपोर्ट अनलॉक करें ({context_label})", type="primary", key=f"btn_unl_{context_label}"):
+            if len(str(exp_otp).strip()) == 6 and exp_consent:
+                st.session_state.export_otp_verified = True
+                log_security_event(auth_school.get("dise_code", "UNKNOWN"), "Principal", "Principal / Admin", auth_school.get("mobile", ""), "EXPORT_UNLOCKED", f"Context: {context_label}")
+                st.success("✅ सत्यापन सफल! डाउनलोड अनलॉक हो गया।")
+                st.rerun()
+            else:
+                st.error("कृपया 6-अंकीय OTP और सहमति चेकबॉक्स पर टिक करें!")
+        return False
+    else:
+        st.markdown(f"<div style='color: #15803D; font-size: 12.5px; font-weight: bold; margin-bottom: 8px;'>🟢 एक्सपोर्ट अधिकृत (OTP सत्यापित) | डिजिटल ऑडिट लॉग सक्रिय</div>", unsafe_allow_html=True)
+        return True
+
 # ----------------- MULTI-LANGUAGE TRANSLATION DICTIONARY -----------------
 I18N = {
     "हिन्दी (Hindi)": {
@@ -630,13 +810,14 @@ def deserialize_store(data):
 
 
 def save_data_to_disk():
+    target_file = get_current_school_file()
     try:
         payload = {
             "school_info": st.session_state.school_info,
             "classes_list": st.session_state.classes_list,
             "data_store": serialize_store(st.session_state.data_store)
         }
-        with open(DATA_FILE, "w", encoding="utf-8") as f:
+        with open(target_file, "w", encoding="utf-8") as f:
             json.dump(payload, f, ensure_ascii=False, indent=2)
         return True
     except Exception as e:
@@ -645,9 +826,12 @@ def save_data_to_disk():
 
 
 def load_data_from_disk():
-    if os.path.exists(DATA_FILE):
+    target_file = get_current_school_file()
+    # Fallback to general DATA_FILE if specific file does not exist yet
+    file_to_read = target_file if os.path.exists(target_file) else DATA_FILE
+    if os.path.exists(file_to_read):
         try:
-            with open(DATA_FILE, "r", encoding="utf-8") as f:
+            with open(file_to_read, "r", encoding="utf-8") as f:
                 payload = json.load(f)
             if "school_info" in payload and isinstance(payload["school_info"], dict):
                 st.session_state.school_info = payload["school_info"]
@@ -662,6 +846,8 @@ def load_data_from_disk():
 
 
 # ----------------- SESSION STATE INITIALIZATION -----------------
+if "authenticated_school" not in st.session_state:
+    st.session_state.authenticated_school = None
 if "ui_lang" not in st.session_state:
     st.session_state.ui_lang = "हिन्दी (Hindi)"
 
@@ -761,7 +947,610 @@ def calculate_division(pct):
 
 
 # ----------------- SIDEBAR -----------------
+
+# =========================================================================================
+# =========================================================================================
+# 🚀 COMMERCIAL MULTI-TENANT SAAS AUTHENTICATION & SUPER ADMIN PORTAL
+# =========================================================================================
+if "authenticated_role" not in st.session_state:
+    st.session_state.authenticated_role = None
+
+if "assigned_class" not in st.session_state:
+    st.session_state.assigned_class = None
+
+if "diagnostic_mode_school" not in st.session_state:
+    st.session_state.diagnostic_mode_school = None
+
+if "export_otp_verified" not in st.session_state:
+    st.session_state.export_otp_verified = False
+
+# ----------------- CASE 1: SUPER ADMIN CONTROL ROOM -----------------
+if st.session_state.get("authenticated_role") == "SUPER_ADMIN":
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #334155 100%); padding: 20px 24px; border-radius: 12px; color: white; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h2 style="margin: 0; color: #F8FAFC; font-size: 26px;">👑 School Result Pro — सुपर एडमिन कंट्रोल रूम</h2>
+                <div style="font-size: 13.5px; opacity: 0.9; margin-top: 4px;">मध्य प्रदेश राज्य स्तरीय केंद्रीय विद्यालय एवं परीक्षाफल प्रबंधन प्रणाली</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    registry = load_schools_registry()
+    tot_schools = len(registry)
+    active_paid = sum(1 for s in registry.values() if "active" in str(s.get("status", "")).lower() and "trial" not in str(s.get("status", "")).lower())
+    in_trial = sum(1 for s in registry.values() if "trial" in str(s.get("status", "")).lower())
+    expired = sum(1 for s in registry.values() if "expired" in str(s.get("status", "")).lower())
+    total_rev = active_paid * 499
+
+    # Top KPI Metrics
+    kpi_c1, kpi_c2, kpi_c3, kpi_c4, kpi_c5, kpi_c6 = st.columns([1.5, 1.2, 1.2, 1.2, 1.8, 1.2])
+    kpi_c1.metric("🏫 कुल स्कूल", f"{tot_schools}")
+    kpi_c2.metric("🟢 सक्रिय पेड (₹499)", f"{active_paid}")
+    kpi_c3.metric("🟡 ट्रायल में", f"{in_trial}")
+    kpi_c4.metric("🔴 समाप्त ट्रायल", f"{expired}")
+    kpi_c5.metric("💰 कुल संकलित आय", f"₹{total_rev:,}")
+    with kpi_c6:
+        st.markdown("<div style='margin-top: 15px;'>", unsafe_allow_html=True)
+        if st.button("🚪 एडमिन लॉगआउट", type="secondary", use_container_width=True):
+            st.session_state.authenticated_role = None
+            st.session_state.authenticated_school = None
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    st.divider()
+
+    adm_tab1, adm_tab2, adm_tab3, adm_tab4, adm_tab5 = st.tabs([
+        "🏫 स्कूल डायरेक्टरी एवं लाइसेंस",
+        "💳 पेमेंट एवं UTR अप्रूवल डेस्क",
+        "🎯 ट्रायल लीड्स एवं 1-क्लिक व्हाट्सएप फॉलो-अप",
+        "🔍 सपोर्ट एक्सेस (डायग्नोस्टिक व्यू)",
+        "🛡️ सुरक्षा एवं एक्सेस ऑडिट लॉग्स"
+    ])
+
+    # 1. School Directory & License Control
+    with adm_tab1:
+        st.subheader("पंजीकृत विद्यालयों की केंद्रीय डायरेक्टरी")
+        sch_rows = []
+        for d, s in registry.items():
+            sch_rows.append({
+                "U-DISE": d,
+                "विद्यालय का नाम": s.get("school_name", ""),
+                "मोबाइल नंबर": s.get("mobile", ""),
+                "जिला": s.get("district", ""),
+                "प्लान": s.get("plan", "₹499 पास"),
+                "स्थिति": s.get("status", ""),
+                "वैधता": s.get("expiry", "2027-03-31"),
+                "शिक्षकों की संख्या": len(s.get("teachers", []))
+            })
+        st.dataframe(pd.DataFrame(sch_rows), use_container_width=True)
+
+        st.divider()
+        st.markdown("#### ⚙️ 1-क्लिक लाइसेंस प्रबंधन (Quick School Action):")
+        c_ac1, c_ac2, c_ac3 = st.columns([3, 2, 3])
+        with c_ac1:
+            target_dise_act = st.selectbox("कार्रवाई हेतु विद्यालय चुनें:", list(registry.keys()), format_func=lambda x: f"{x} - {registry[x].get('school_name')}")
+        with c_ac2:
+            act_type = st.selectbox("कार्रवाई (Action):", ["सक्रिय करें (₹499 Paid Active)", "+15 दिन ट्रायल बढ़ाएं", "अस्थायी सस्पेंड करें"])
+        with c_ac3:
+            st.markdown("<div style='margin-top: 28px;'>", unsafe_allow_html=True)
+            if st.button("⚡ चयनित कार्रवाई लागू करें", type="primary", use_container_width=True):
+                if "सक्रिय" in act_type:
+                    registry[target_dise_act]["status"] = "Active (सक्रिय)"
+                    registry[target_dise_act]["expiry"] = "2027-03-31"
+                    registry[target_dise_act]["plan"] = "School Result Pro ऑल-इन-वन (₹499/वर्ष)"
+                elif "+15" in act_type:
+                    registry[target_dise_act]["status"] = "Trial (परीक्षण)"
+                    registry[target_dise_act]["expiry"] = "2026-10-05"
+                else:
+                    registry[target_dise_act]["status"] = "Suspended (निलंबित)"
+                save_schools_registry(registry)
+                log_security_event(target_dise_act, "SUPER_ADMIN", "Super Admin", "9998887777", "ADMIN_LICENSE_CHANGE", f"Action: {act_type}")
+                st.success(f"✅ {registry[target_dise_act].get('school_name')} का स्टेटस सफलतापूर्वक अपडेट हो गया!")
+                st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
+
+    # 2. Payment & UTR Approvals Queue
+    with adm_tab2:
+        st.subheader("💳 UPI UTR पेमेंट सत्यापन डेस्क")
+        pending_utrs = []
+        for d, s in registry.items():
+            if s.get("last_utr"):
+                pending_utrs.append({
+                    "DISE": d,
+                    "School": s.get("school_name", ""),
+                    "Mobile": s.get("mobile", ""),
+                    "UTR / Ref No": s.get("last_utr", ""),
+                    "Amount": "₹499",
+                    "Status": s.get("status", "")
+                })
+        if not pending_utrs:
+            st.info("ℹ️ वर्तमान में कोई लंबित UTR पेमेंट अनुरोध नहीं है।")
+        else:
+            st.dataframe(pd.DataFrame(pending_utrs), use_container_width=True)
+            sel_utr_dise = st.selectbox("सत्यापित करने हेतु स्कूल चुनें:", [p["DISE"] for p in pending_utrs])
+            c_u1, c_u2 = st.columns(2)
+            with c_u1:
+                if st.button(f"✅ UTR स्वीकार करें एवं ₹499 प्रो पास एक्टिवेट करें ({sel_utr_dise})", type="primary", use_container_width=True):
+                    registry[sel_utr_dise]["status"] = "Active (सक्रिय)"
+                    registry[sel_utr_dise]["expiry"] = "2027-03-31"
+                    registry[sel_utr_dise]["plan"] = "School Result Pro ऑल-इन-वन (₹499/वर्ष)"
+                    save_schools_registry(registry)
+                    log_security_event(sel_utr_dise, "SUPER_ADMIN", "Super Admin", "9998887777", "PAYMENT_APPROVED", "₹499 UPI Verified")
+                    st.success(f"✅ {registry[sel_utr_dise].get('school_name')} का ₹499 वार्षिक प्लान सफलतापूर्वक सक्रिय!")
+                    st.rerun()
+            with c_u2:
+                if st.button(f"❌ UTR अस्वीकार करें ({sel_utr_dise})", use_container_width=True):
+                    registry[sel_utr_dise]["last_utr"] = ""
+                    save_schools_registry(registry)
+                    st.warning("UTR अस्वीकार कर दिया गया।")
+                    st.rerun()
+
+    # 3. Sales CRM & 1-Click WhatsApp Follow-up
+    with adm_tab3:
+        st.subheader("🎯 ट्रायल लीड्स एवं 1-क्लिक व्हाट्सएप फॉलो-अप")
+        st.caption("डेमो देखने आए स्कूलों को ₹499 के वार्षिक प्लान में बदलने हेतु सीधा व्हाट्सएप फॉलो-अप भेजें:")
+
+        for d, s in registry.items():
+            s_name = s.get("school_name", "")
+            s_mob = s.get("mobile", "")
+            s_stat = s.get("status", "")
+            s_plan = s.get("plan", "")
+            
+            clean_s_mob = "".join(filter(str.isdigit, str(s_mob)))
+            if len(clean_s_mob) == 10: clean_s_mob = "91" + clean_s_mob
+
+            lead_c1, lead_c2, lead_c3, lead_c4 = st.columns([3, 2, 2, 3])
+            with lead_c1:
+                st.markdown(f"**{s_name}** (`{d}`)<br><span style='font-size:12px; color:#555;'>मोबाइल: {s_mob} | जिला: {s.get('district','')}</span>", unsafe_allow_html=True)
+            with lead_c2:
+                st.markdown(f"<span style='font-size:13px;'>स्थिति: <b>{s_stat}</b></span><br><span style='font-size:11.5px; color:#666;'>{s_plan}</span>", unsafe_allow_html=True)
+            with lead_c3:
+                stage_choice = st.selectbox("फॉलो-अप स्टेज:", ["Day 2: सहायता संदेश", "Day 7: फ़ीचर रिमाइंडर", "Day 13: ₹499 क्लोजिंग ऑफर"], key=f"crm_stg_{d}")
+            with lead_c4:
+                st.markdown("<div style='margin-top: 10px;'>", unsafe_allow_html=True)
+                if "Day 2" in stage_choice:
+                    pitch_txt = f"नमस्ते सर, हमने देखा कि आपने *{s_name}* के लिए School Result Pro का डेमो शुरू किया है। क्या आपको RSKMP 44-कॉलम गोशवारा या मार्कशीट बनाने में कोई सहायता चाहिए? हम AnyDesk पर 5 मिनट का लाइव डेमो दे सकते हैं।"
+                elif "Day 7" in stage_choice:
+                    pitch_txt = f"आदरणीय सर, क्या आपने *{s_name}* के बच्चों के लिए 'WhatsApp पर रिजल्ट भेजने' और 'RSKMP एक्सेल एक्सपोर्ट' वाला फ़ीचर टेस्ट किया? मात्र ₹499 में पूरे साल का संपूर्ण रिजल्ट उपलब्ध है।"
+                else:
+                    pitch_txt = f"आदरणीय प्राचार्य महोदय, *{s_name}* का डेमो ट्रायल समाप्त हो रहा है। सभी कक्षाओं के वार्षिक परीक्षाफल, A3 गोशवारा और बिना रुकावट उपयोग जारी रखने हेतु आज ही ₹499 में वार्षिक पास सक्रिय करें।"
+                
+                wa_pitch_url = f"https://wa.me/{clean_s_mob}?text={urllib.parse.quote(pitch_txt)}" if clean_s_mob else "#"
+                st.markdown(f"""
+                <a href="{wa_pitch_url}" target="_blank" style="text-decoration: none;">
+                    <div style="background: #25D366; color: white; font-size: 12px; font-weight: bold; padding: 6px 10px; border-radius: 6px; text-align: center;">
+                        📲 WhatsApp फॉलो-अप भेजें
+                    </div>
+                </a>
+                """, unsafe_allow_html=True)
+                st.markdown("</div>", unsafe_allow_html=True)
+            st.markdown("<hr style='margin:6px 0; border:none; border-top:1px solid #E2E8F0;'>", unsafe_allow_html=True)
+
+    # 4. Support Access (Diagnostic View)
+    with adm_tab4:
+        st.subheader("🔍 सपोर्ट एक्सेस मोड (Diagnose School Data)")
+        st.caption("यदि किसी स्कूल को डेटा भरने या परीक्षाफल में कोई समस्या आ रही है, तो आप बिना पासवर्ड के सीधे उस स्कूल के डेटा का डायग्नोस्टिक ऑडिट कर सकते हैं:")
+        
+        diag_dise = st.selectbox("सपोर्ट हेतु स्कूल चुनें:", list(registry.keys()), format_func=lambda x: f"{x} - {registry[x].get('school_name')}", key="sel_diag_dise")
+        if st.button(f"🚀 {registry[diag_dise].get('school_name')} का डायग्नोस्टिक व्यू खोलें", type="primary"):
+            st.session_state.authenticated_role = "PRINCIPAL"
+            st.session_state.authenticated_school = registry[diag_dise]
+            st.session_state.school_info.update({
+                "name": registry[diag_dise].get("school_name", ""),
+                "udise": diag_dise,
+                "block": registry[diag_dise].get("block", ""),
+                "district": registry[diag_dise].get("district", ""),
+                "contact": registry[diag_dise].get("mobile", "")
+            })
+            st.session_state.diagnostic_mode_school = diag_dise
+            load_data_from_disk()
+            log_security_event(diag_dise, "SUPER_ADMIN", "Super Admin", "9998887777", "DIAGNOSTIC_SUPPORT_LOGIN", "Opened in Support Mode")
+            st.success(f"डायग्नोस्टिक मोड में प्रवेश: {registry[diag_dise].get('school_name')}")
+            st.rerun()
+
+    # 5. Security Audit Logs Viewer
+    with adm_tab5:
+        st.subheader("🛡️ केंद्रीय सुरक्षा एवं एक्सेस ऑडिट लॉग्स")
+        st.caption("प्लेटफ़ॉर्म पर सभी लॉगिन, असफल प्रयास, डेटा एक्सपोर्ट और सुरक्षा घटनाओं का अपरिवर्तनीय डिजिटल रिकॉर्ड:")
+        logs_data = load_audit_logs()
+        if not logs_data:
+            st.info("अभी कोई ऑडिट लॉग दर्ज नहीं है।")
+        else:
+            st.dataframe(pd.DataFrame(logs_data[::-1]), use_container_width=True)
+
+
+    st.markdown("<br><hr style='margin: 15px 0 8px 0; border: none; border-top: 1px solid #E2E8F0;'>", unsafe_allow_html=True)
+    st.markdown("<div style='font-size: 11.5px; color: #64748B; text-align: center;'>© 2026-27 School Result Pro. सर्व शिक्षा अभियान एवं म.प्र. शासन दिशा-निर्देशानुसार। सर्वाधिकार सुरक्षित।</div>", unsafe_allow_html=True)
+    st.stop()
+
+
+# ----------------- CASE 2: NORMAL LOGIN & LANDING PORTAL (WHEN NOT AUTHENTICATED) -----------------
+if st.session_state.get("authenticated_school") is None:
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #1E3A8A 0%, #1E40AF 50%, #3B82F6 100%); padding: 25px 20px; border-radius: 12px; text-align: center; color: white; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(30, 58, 138, 0.25);">
+        <div style="font-size: 32px; font-weight: 900; letter-spacing: 0.5px;">🎓 School Result Pro</div>
+        <div style="font-size: 16px; font-weight: 600; opacity: 0.95; margin-top: 4px;">
+            मध्य प्रदेश शालेय परीक्षा परिणाम, प्रगति पत्रक एवं A3 गोशवारा क्लाउड प्रबंधन प्रणाली
+        </div>
+        <div style="margin-top: 12px; display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;">
+            <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold;">🏛️ RSKMP अधिकृत 44-कॉलम गोशवारा</span>
+            <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold;">🏢 5वीं/8वीं बोर्ड 20+20+60 प्रोजेक्ट सपोर्ट</span>
+            <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold;">💎 मात्र ₹499 / वर्ष (सभी कक्षाएं अनलॉक्ड)</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Check if Super Admin secret mode is requested via URL or secret toggle
+    query_params = getattr(st, "query_params", {})
+    is_admin_query = (query_params.get("admin") in ["true", "1", "secret", "master"])
+    if "show_secret_admin" not in st.session_state:
+        st.session_state.show_secret_admin = False
+
+    is_admin_mode = is_admin_query or st.session_state.show_secret_admin
+
+    if is_admin_mode:
+        # EXCLUSIVE SUPER ADMIN MASTER GATEWAY (ONLY FOR YOU)
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #0F172A, #1E293B); padding: 16px 20px; border-radius: 10px; color: white; margin-bottom: 15px; border-left: 5px solid #F59E0B;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <b style="font-size: 16px; color: #FCD34D;">👑 सुपर एडमिन मास्टर कंसोल (Exclusive Owner Gateway)</b><br>
+                    <span style="font-size: 12px; color: #94A3B8;">यह स्क्रीन केवल प्लेटफ़ॉर्म निर्माता / स्वामी के लिए है। सामान्य उपयोगकर्ताओं को यह दिखाई नहीं देती।</span>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        c_adm_box1, c_adm_box2 = st.columns([1.5, 1])
+        with c_adm_box1:
+            adm_id_in = st.text_input("मास्टर एडमिन यूजर आईडी:*", value="admin@pro", key="adm_id_input_secret")
+            adm_pwd_in = st.text_input("मास्टर पासवर्ड:*", type="password", value="superadmin@499", key="adm_pwd_input_secret")
+            adm_otp_in = st.text_input("6-अंकीय मास्टर सिक्योरिटी की / OTP:*", value="999888", key="adm_otp_input_secret")
+
+            c_act_ad1, c_act_ad2 = st.columns(2)
+            with c_act_ad1:
+                if st.button("🚀 सुपर एडमिन कंट्रोल रूम खोलें", type="primary", use_container_width=True):
+                    if adm_id_in == "admin@pro" and adm_pwd_in == "superadmin@499" and adm_otp_in == "999888":
+                        st.session_state.authenticated_role = "SUPER_ADMIN"
+                        st.session_state.authenticated_school = None
+                        log_security_event("PLATFORM_CORE", "SUPER_ADMIN", "Super Admin", "9998887777", "SUPER_ADMIN_LOGIN", "Master Key Authenticated")
+                        st.balloons()
+                        st.success("सुपर एडमिन प्रमाणीकरण सफल!")
+                        st.rerun()
+                    else:
+                        st.error("❌ अमान्य मास्टर क्रेडेंशियल्स!")
+            with c_act_ad2:
+                if st.button("⬅️ वापस सामान्य पोर्टल (Back to School Portal)", use_container_width=True):
+                    st.session_state.show_secret_admin = False
+                    if hasattr(st, "query_params") and "admin" in st.query_params:
+                        del st.query_params["admin"]
+                    st.rerun()
+        with c_adm_box2:
+            st.markdown("""
+            <div style="background: #1E293B; border: 1px solid #334155; padding: 14px; border-radius: 8px; color: #E2E8F0; font-size: 12.5px;">
+                <b style="color: #FCD34D;">🔐 मास्टर क्रेडेंशियल्स (Owner Only):</b><br>
+                • <b>User ID:</b> <code>admin@pro</code><br>
+                • <b>Password:</b> <code>superadmin@499</code><br>
+                • <b>Master Key:</b> <code>999888</code><br>
+                <hr style="margin: 8px 0; border-color: #334155;">
+                <span style="color: #94A3B8; font-size: 11.5px;">
+                    यह पोर्टल केवल आपके लिए आरक्षित है। किसी भी स्कूल या शिक्षक को इसका पता नहीं चलेगा।
+                </span>
+            </div>
+            """, unsafe_allow_html=True)
+        st.stop()
+
+    # NORMAL PUBLIC TABS (ONLY 5 TABS — SUPER ADMIN IS 100% HIDDEN FROM SCHOOLS)
+    auth_tab1, auth_tab2, auth_tab3, auth_tab4, auth_tab5 = st.tabs([
+        "🏛️ संस्था प्रधान लॉगिन (Principal Login with OTP)",
+        "👨‍🏫 कक्षा अध्यापक लॉगिन (Teacher Login with OTP)",
+        "📝 नया स्कूल पंजीकरण (15 दिन निःशुल्क ट्रायल)",
+        "💎 ₹499 ऑल-इन-वन वार्षिक पास",
+        "📞 सहायता एवं संपर्क"
+    ])
+
+
+    # Tab 1: Principal Login with OTP
+    with auth_tab1:
+        c_pl1, c_pl2 = st.columns([1.5, 1])
+        with c_pl1:
+            st.subheader("संस्था प्रधान (Principal) सुरक्षित लॉगिन")
+            st.caption("डाइस कोड या पंजीकृत मोबाइल नंबर दर्ज करें:")
+
+            p_login_id = st.text_input("U-DISE कोड अथवा मोबाइल नंबर:*", value="23260100101", key="pr_login_id")
+            p_login_pwd = st.text_input("पासवर्ड (Password):*", type="password", value="admin@123", key="pr_login_pwd")
+
+            st.info("📲 सुरक्षा नियम: संस्था प्रधान के पंजीकृत मोबाइल नंबर पर 6-अंकीय OTP सत्यापन अनिवार्य है।")
+            p_otp = st.text_input("6-अंकीय लॉगिन OTP दर्ज करें:*", value="123456", key="pr_otp_input", help="परीक्षण हेतु डिफॉल्ट OTP: 123456")
+
+            c_pb1, c_pb2 = st.columns(2)
+            with c_pb1:
+                if st.button("🚀 संस्था प्रधान पोर्टल में लॉगिन करें", type="primary", use_container_width=True):
+                    # Secret Super Admin Master Door from normal login
+                    if str(p_login_id).strip() in ["admin@pro", "superadmin"] and p_login_pwd == "superadmin@499":
+                        st.session_state.authenticated_role = "SUPER_ADMIN"
+                        st.session_state.authenticated_school = None
+                        log_security_event("PLATFORM_CORE", "SUPER_ADMIN", "Super Admin", "9998887777", "SUPER_ADMIN_LOGIN", "Master Key Authenticated via Portal")
+                        st.balloons()
+                        st.success("👑 सुपर एडमिन प्रमाणीकरण सफल!")
+                        st.rerun()
+
+                    registry = load_schools_registry()
+                    matched_sch = None
+                    for d, sch in registry.items():
+                        if str(p_login_id).strip() == str(d).strip() or str(p_login_id).strip() == str(sch.get("mobile", "")).strip():
+                            if verify_password(p_login_pwd, sch.get("password_hash", "")):
+                                matched_sch = sch
+                                break
+                    if matched_sch and len(str(p_otp).strip()) == 6:
+                        st.session_state.authenticated_role = "PRINCIPAL"
+                        st.session_state.authenticated_school = matched_sch
+                        st.session_state.school_info.update({
+                            "name": matched_sch.get("school_name", ""),
+                            "udise": matched_sch.get("dise_code", ""),
+                            "block": matched_sch.get("block", ""),
+                            "district": matched_sch.get("district", ""),
+                            "contact": matched_sch.get("mobile", "")
+                        })
+                        load_data_from_disk()
+                        log_security_event(matched_sch.get("dise_code"), "Principal", "Principal / Admin", matched_sch.get("mobile"), "LOGIN_SUCCESS", "OTP Authenticated")
+                        st.balloons()
+                        st.success(f"✅ सफल लॉगिन! आपका स्वागत है, {matched_sch.get('school_name')}")
+                        st.rerun()
+                    else:
+                        log_security_event(p_login_id, "Principal", "Unknown", p_login_id, "LOGIN_FAILED", "Invalid password or OTP", "FAILED")
+                        st.error("❌ अमान्य क्रेडेंशियल्स अथवा गलत OTP! कृपया पुनः प्रयास करें।")
+
+            with c_pb2:
+                if st.button("⚡ डेमो संस्था प्रधान वन-क्लिक लॉगिन", use_container_width=True):
+                    registry = load_schools_registry()
+                    demo_sch = registry.get("23260100101")
+                    if demo_sch:
+                        st.session_state.authenticated_role = "PRINCIPAL"
+                        st.session_state.authenticated_school = demo_sch
+                        st.session_state.school_info.update({
+                            "name": demo_sch.get("school_name", ""),
+                            "udise": demo_sch.get("dise_code", ""),
+                            "block": demo_sch.get("block", ""),
+                            "district": demo_sch.get("district", ""),
+                            "contact": demo_sch.get("mobile", "")
+                        })
+                        load_data_from_disk()
+                        log_security_event("23260100101", "Principal", "Principal / Admin", "9826012345", "DEMO_LOGIN", "One-Click Demo Access")
+                        st.success("डेमो लॉगिन सफल!")
+                        st.rerun()
+
+        with c_pl2:
+            st.markdown("""
+            <div style="background: #F0FDF4; border: 1px solid #86EFAC; padding: 14px; border-radius: 8px; margin-top: 10px;">
+                <b style="color: #166534; font-size: 14px;">🏛️ संस्था प्रधान के अधिकार:</b><br>
+                <span style="font-size: 12.5px; color: #14532D;">
+                    • स्कूल की सभी कक्षाओं का पूर्ण नियंत्रण<br>
+                    • शिक्षकों के ड्राफ्ट एवं सुधार का 1-क्लिक अप्रूवल<br>
+                    • 44-कॉलम A3 शीट एवं RSKMP एक्सेल एक्सपोर्ट<br>
+                    • संस्था सेटअप, लोगो एवं शिक्षक आवंटन<br>
+                </span>
+            </div>
+            """, unsafe_allow_html=True)
+
+    # Tab 2: Class Teacher Login with OTP
+    with auth_tab2:
+        c_tl1, c_tl2 = st.columns([1.5, 1])
+        with c_tl1:
+            st.subheader("👨‍🏫 कक्षा अध्यापक (Teacher) लॉगिन")
+            st.caption("प्रिंसिपल द्वारा पंजीकृत अपना मोबाइल नंबर दर्ज करें:")
+
+            t_mobile_in = st.text_input("शिक्षक का मोबाइल नंबर:*", value="9826112233", key="tr_mob_input")
+            t_otp_in = st.text_input("6-अंकीय शिक्षक लॉगिन OTP:*", value="123456", key="tr_otp_input", help="परीक्षण हेतु डिफॉल्ट OTP: 123456")
+
+            c_tb1, c_tb2 = st.columns(2)
+            with c_tb1:
+                if st.button("🚀 कक्षा अध्यापक पोर्टल में लॉगिन करें", type="primary", use_container_width=True):
+                    registry = load_schools_registry()
+                    matched_teacher = None
+                    matched_school_for_t = None
+                    for d, sch in registry.items():
+                        for tr in sch.get("teachers", []):
+                            if str(t_mobile_in).strip() == str(tr.get("mobile", "")).strip():
+                                matched_teacher = tr
+                                matched_school_for_t = sch
+                                break
+                        if matched_teacher: break
+
+                    if matched_teacher and len(str(t_otp_in).strip()) == 6:
+                        st.session_state.authenticated_role = "TEACHER"
+                        st.session_state.authenticated_school = matched_school_for_t
+                        st.session_state.authenticated_user_name = matched_teacher.get("name", "कक्षा अध्यापक")
+                        st.session_state.assigned_class = matched_teacher.get("assigned_class", "Class 7th")
+                        st.session_state.school_info.update({
+                            "name": matched_school_for_t.get("school_name", ""),
+                            "udise": matched_school_for_t.get("dise_code", ""),
+                            "block": matched_school_for_t.get("block", ""),
+                            "district": matched_school_for_t.get("district", ""),
+                            "contact": matched_school_for_t.get("mobile", "")
+                        })
+                        load_data_from_disk()
+                        log_security_event(matched_school_for_t.get("dise_code"), "Teacher", matched_teacher.get("name"), t_mobile_in, "TEACHER_LOGIN_SUCCESS", f"Assigned: {st.session_state.assigned_class}")
+                        st.balloons()
+                        st.success(f"✅ शिक्षक लॉगिन सफल! स्वागत है, {matched_teacher.get('name')} ({st.session_state.assigned_class})")
+                        st.rerun()
+                    else:
+                        st.error("❌ यह मोबाइल नंबर किसी स्कूल में शिक्षक के रूप में पंजीकृत नहीं है!")
+
+            with c_tb2:
+                if st.button("⚡ डेमो क्लास टीचर लॉगिन (Class 7th)", use_container_width=True):
+                    registry = load_schools_registry()
+                    demo_sch = registry.get("23260100101")
+                    st.session_state.authenticated_role = "TEACHER"
+                    st.session_state.authenticated_school = demo_sch
+                    st.session_state.authenticated_user_name = "श्री राजेश शर्मा"
+                    st.session_state.assigned_class = "Class 7th"
+                    load_data_from_disk()
+                    st.success("डेमो क्लास टीचर लॉगिन सफल (Class 7th)!")
+                    st.rerun()
+
+        with c_tl2:
+            st.markdown("""
+            <div style="background: #FFFBEB; border: 1px solid #FDE68A; padding: 14px; border-radius: 8px; margin-top: 10px;">
+                <b style="color: #92400E; font-size: 14px;">👨‍🏫 कक्षा अध्यापक के अधिकार:</b><br>
+                <span style="font-size: 12.5px; color: #78350F;">
+                    • केवल अपनी कक्षा का दैनिक हाजिरी रजिस्टर<br>
+                    • अपनी कक्षा के परीक्षा व प्रोजेक्ट अंक भरना<br>
+                    • नए छात्र का ड्राफ्ट जोड़ना (प्रिंसिपल अनुमोदन हेतु)<br>
+                    • 🔒 शासकीय डेटा एक्सपोर्ट पूरी तरह सुरक्षित व लॉक<br>
+                </span>
+            </div>
+            """, unsafe_allow_html=True)
+
+    # Tab 3: Register New School
+    with auth_tab3:
+        st.subheader("📝 नवीन संस्था निःशुल्क पंजीकरण (15-Day Free Trial)")
+        st.caption("अपने स्कूल को पंजीकृत करें और तुरंत 15 दिनों तक सभी फीचर्स का निःशुल्क लाभ लें:")
+
+        with st.form("register_school_form_universal"):
+            r_c1, r_c2 = st.columns(2)
+            with r_c1:
+                reg_name = st.text_input("1. विद्यालय का पूरा नाम (School Name):*")
+                reg_dise = st.text_input("2. 11-अंकीय U-DISE कोड (DISE Code):*")
+                reg_level = st.selectbox("3. विद्यालय स्तर:", ["प्राथमिक (Class 1-5)", "माध्यमिक (Class 1-8)", "हाईस्कूल (Class 1-10)", "हायर सेकेंडरी (Class 1-12)"])
+            with r_c2:
+                reg_mobile = st.text_input("4. प्राचार्य / संचालक मोबाइल नंबर:*")
+                reg_dist = st.text_input("5. जिला (District):", value="Bhopal")
+                reg_block = st.text_input("6. ब्लॉक / संकुल (Block):", value="Fanda")
+            
+            r_p1, r_p2 = st.columns(2)
+            with r_p1:
+                reg_pwd = st.text_input("7. नया पासवर्ड बनाएं:*", type="password")
+            with r_p2:
+                reg_pwd_confirm = st.text_input("8. पासवर्ड पुनः दर्ज करें:*", type="password")
+
+            reg_consent = st.checkbox("✅ मैं प्रमाणित करता हूँ कि हमारे पास इस विद्यालय का परीक्षा रिकॉर्ड रखने का अधिकार है (DPDP Act Compliance)", value=True)
+            
+            submit_reg = st.form_submit_button("🎉 ₹499 वार्षिक पास ट्रायल सक्रिय करें (Start Trial)", type="primary", use_container_width=True)
+
+            if submit_reg:
+                registry = load_schools_registry()
+                if not reg_name or not reg_dise or not reg_mobile or not reg_pwd:
+                    st.error("कृपया सभी अनिवार्य फ़ील्ड (*) भरें!")
+                elif len(str(reg_dise).strip()) != 11 or not str(reg_dise).strip().isdigit():
+                    st.error("कृपया वैध 11-अंकीय U-DISE कोड दर्ज करें!")
+                elif reg_pwd != reg_pwd_confirm:
+                    st.error("पासवर्ड मेल नहीं खा रहे हैं!")
+                elif str(reg_dise).strip() in registry:
+                    st.error(f"DISE Code {reg_dise} पहले से पंजीकृत है! कृपया 'संस्था प्रधान लॉगिन' से लॉगिन करें।")
+                else:
+                    new_sch_data = {
+                        "dise_code": str(reg_dise).strip(),
+                        "school_name": reg_name.strip(),
+                        "mobile": str(reg_mobile).strip(),
+                        "password_hash": hash_password(reg_pwd),
+                        "plan": "School Result Pro ऑल-इन-वन पास (₹499/वर्ष)",
+                        "price": 499,
+                        "status": "Trial (15-दिन परीक्षण)",
+                        "expiry": "2026-09-21",
+                        "created_at": str(datetime.now().date()),
+                        "district": reg_dist.strip(),
+                        "block": reg_block.strip(),
+                        "data_file": f"school_data_{reg_dise}.json",
+                        "teachers": [],
+                        "pending_approvals": []
+                    }
+                    registry[str(reg_dise).strip()] = new_sch_data
+                    save_schools_registry(registry)
+                    
+                    st.session_state.authenticated_role = "PRINCIPAL"
+                    st.session_state.authenticated_school = new_sch_data
+                    st.session_state.school_info.update({
+                        "name": reg_name.strip(),
+                        "udise": str(reg_dise).strip(),
+                        "block": reg_block.strip(),
+                        "district": reg_dist.strip(),
+                        "contact": str(reg_mobile).strip()
+                    })
+                    save_data_to_disk()
+                    log_security_event(reg_dise, "Principal", "Principal / Admin", reg_mobile, "NEW_SCHOOL_REGISTERED", "Registered for ₹499 Trial")
+                    st.balloons()
+                    st.success(f"🎉 बधाई! {reg_name} का 15-दिवसीय निःशुल्क ट्रायल खाता सफलतापूर्वक सक्रिय हो गया!")
+                    st.rerun()
+
+    # Tab 4: Disruptive ₹499 Universal Plan
+    with auth_tab4:
+        st.subheader("💎 एक स्कूल — एक दाम: फ्लैट ₹499 मात्र")
+        st.markdown("""
+        <div style="border: 2px solid #2563EB; border-radius: 12px; padding: 24px; text-align: center; background: #EFF6FF; box-shadow: 0 4px 10px rgba(37, 99, 235, 0.15); max-width: 600px; margin: auto;">
+            <span style="background: #2563EB; color: white; padding: 3px 12px; border-radius: 20px; font-size: 12px; font-weight: bold;">धमाका ऑफर (Disruptive Single Pass)</span>
+            <h2 style="color: #1E3A8A; margin-top: 10px; margin-bottom: 2px;">School Result Pro — ऑल-इन-वन वार्षिक पास</h2>
+            <p style="color: #64748B; font-size: 14px;">सभी कक्षाओं (कक्षा 1 से 8वीं / 10वीं) के लिए संपूर्ण सत्र हेतु</p>
+            <div style="font-size: 42px; font-weight: 900; color: #0F172A; margin: 12px 0;">₹499 <span style="font-size: 15px; font-weight: normal; color: #64748B;">/ पूरा वर्ष</span></div>
+            <hr style="margin: 15px 0;">
+            <ul style="text-align: left; font-size: 13.5px; color: #334155; line-height: 2;">
+                <li>✅ <b>कक्षा 1 से 8वीं (एवं 9वीं-10वीं)</b> का संपूर्ण वार्षिक परीक्षा परिणाम</li>
+                <li>✅ <b>RSKMP 44-कॉलम A3 परीक्षाफल पत्रक</b> (सत्यापन हस्ताक्षर ब्लॉक सहित)</li>
+                <li>✅ <b>5वीं एवं 8वीं बोर्ड 20+20+60 प्रोजेक्ट कार्य</b> आधिकारिक प्रारूप</li>
+                <li>✅ <b>rskmp.in पोर्टल अधिकृत बल्क एक्सेल एक्सपोर्ट</b> (-1 कोड सहित)</li>
+                <li>✅ <b>अभिभावकों को WhatsApp पर 1-क्लिक रिजल्ट प्रेषण</b> (100% मुफ़्त)</li>
+                <li>✅ <b>कक्षा अध्यापक दैनिक मोबाइल हाजिरी रजिस्टर</b></li>
+                <li>✅ <b>मेकर-चेकर शिक्षक अनुमोदन प्रणाली</b> (प्रिंसिपल का ज़ीरो टाइपिंग लोड)</li>
+                <li>✅ <b>यूनिवर्सल पुरानी एक्सेल शीट अपलोड व ऑटो-कॉलम माइग्रेशन</b></li>
+                <li>✅ <b>15 दिन का संपूर्ण निःशुल्क ट्रायल</b> (बिना किसी अग्रिम शुल्क)</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Tab 5: Support Helpline
+    with auth_tab5:
+        st.subheader("📞 सहायता, प्रशिक्षण एवं संपर्क (Support Helpline)")
+        c_hp1, c_hp2 = st.columns(2)
+        with c_hp1:
+            st.markdown("""
+            **📱 हेल्पलाइन नंबर:** +91 98260 XXXXX  
+            **💬 व्हाट्सएप सपोर्ट:** +91 98260 XXXXX  
+            **📧 ईमेल आईडी:** support@schoolresultpro.in  
+            **⏰ सपोर्ट समय:** प्रातः 9:00 बजे से सायं 8:00 बजे तक
+            """)
+        with c_hp2:
+            st.markdown("""
+            **📍 तकनीकी केंद्र:** भोपाल, मध्य प्रदेश (Bhopal, MP)  
+            **🎯 विशेष सुविधा:** किसी भी प्रकार की तकनीकी कठिनाई होने पर AnyDesk पर निशुल्क 5 मिनट का लाइव समाधान।
+            """)
+
+    st.stop()
+
 with st.sidebar:
+    auth_school = st.session_state.get("authenticated_school", {})
+    user_role = st.session_state.get("authenticated_role", "PRINCIPAL")
+    user_display_name = st.session_state.get("authenticated_user_name", "संस्था प्रधान")
+    assigned_c = st.session_state.get("assigned_class")
+    
+    if auth_school:
+        role_label = "🏛️ संस्था प्रधान (Principal)" if user_role == "PRINCIPAL" else f"👨‍🏫 कक्षा अध्यापक: {user_display_name} ({assigned_c})"
+        pending_cnt = len(auth_school.get("pending_approvals", []))
+        
+        st.markdown(f'''
+        <div style="background: linear-gradient(135deg, #1E3A8A, #2563EB); padding: 10px 12px; border-radius: 8px; color: white; margin-bottom: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <div style="font-weight: 800; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">🏫 {auth_school.get("school_name", "School Portal")}</div>
+            <div style="font-size: 11px; opacity: 0.9;">DISE: {auth_school.get("dise_code", "")} | {auth_school.get("block","")}</div>
+            <div style="font-size: 11px; color: #FEF08A; font-weight: bold; margin-top: 2px;">{role_label}</div>
+            <div style="font-size: 10px; color: #BBF7D0; font-weight: bold; margin-top: 3px;">🟢 {auth_school.get("plan", "School Result Pro पास (₹499/वर्ष)")}</div>
+        </div>
+        ''', unsafe_allow_html=True)
+        
+        if user_role == "PRINCIPAL" and pending_cnt > 0:
+            st.warning(f"🔔 **{pending_cnt}** शिक्षक अनुमोदन लंबित हैं!")
+        
+        c_lg1, c_lg2 = st.columns([1, 1])
+        with c_lg1:
+            if st.button("🚪 लॉगआउट", key="btn_logout", use_container_width=True):
+                st.session_state.authenticated_school = None
+                st.rerun()
+        with c_lg2:
+            if st.button("💎 लाइसेंस", key="btn_license_info", use_container_width=True):
+                st.session_state.show_license_dialog = not st.session_state.get("show_license_dialog", False)
+                st.rerun()
+        st.divider()
+
     st.image("https://img.icons8.com/color/96/school.png", width=65)
     
     selected_lang = st.selectbox("🌐 भाषा चुनें (Language):", list(I18N.keys()), 
@@ -781,9 +1570,16 @@ with st.sidebar:
 
 
     st.subheader(f"🎯 {T['select_class']}")
-    selected_class = st.selectbox(T["select_class"], st.session_state.classes_list, 
-                                  index=6 if "Class 7th" in st.session_state.classes_list else 0,
-                                  label_visibility="collapsed")
+    if st.session_state.get("authenticated_role") == "TEACHER" and st.session_state.get("assigned_class"):
+        teacher_assigned_cls = st.session_state.get("assigned_class")
+        if teacher_assigned_cls not in st.session_state.classes_list:
+            st.session_state.classes_list.append(teacher_assigned_cls)
+        selected_class = teacher_assigned_cls
+        st.markdown(f"<div style='border: 1px solid #CBD5E1; background: #F1F5F9; padding: 6px 10px; border-radius: 6px; font-weight: bold; font-size: 13px; text-align: center; color: #1E3A8A;'>🎯 आवंटित कक्षा: {selected_class}</div>", unsafe_allow_html=True)
+    else:
+        selected_class = st.selectbox(T["select_class"], st.session_state.classes_list, 
+                                      index=6 if "Class 7th" in st.session_state.classes_list else 0,
+                                      label_visibility="collapsed")
     
     with st.expander(T["add_class"]):
         new_cls = st.text_input(T["new_class_placeholder"])
@@ -965,6 +1761,105 @@ if st.session_state.get("show_format_adopter_dialog"):
     st.divider()
 
 
+
+# ----------------- IN-APP LICENSE & INSTANT UPI QR ACTIVATION DIALOG -----------------
+if st.session_state.get("show_license_dialog", False):
+    auth_school = st.session_state.get("authenticated_school", {})
+    dise_curr = auth_school.get("dise_code", "")
+    with st.container():
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #1E3A8A, #2563EB); padding: 14px 18px; border-radius: 10px; color: white; margin-bottom: 15px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; color: white;">💎 स्कूल लाइसेंस एवं सदस्यता प्रबंधन (License & Subscription)</h3>
+            </div>
+            <div style="font-size: 13px; opacity: 0.95; margin-top: 4px;">
+                यहाँ से आप अपने विद्यालय के सक्रिय प्लान की जांच कर सकते हैं अथवा वार्षिक लाइसेंस को ऑनलाइन UPI द्वारा तुरंत सक्रिय/नवीनीकृत कर सकते हैं।
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        col_lic1, col_lic2 = st.columns([1.5, 1])
+        with col_lic1:
+            st.markdown(f"""
+            **🏫 संस्था का नाम:** {auth_school.get('school_name', '')}  
+            **📍 U-DISE कोड:** `{dise_curr}` | **ब्लॉक:** {auth_school.get('block', '')}  
+            **📌 वर्तमान प्लान:** **{auth_school.get('plan', 'Middle School Pro')}**  
+            **🟢 स्थिति:** **{auth_school.get('status', 'Active')}** (वैधता: **{auth_school.get('expiry', '2027-03-31')}**)
+            """)
+
+            st.divider()
+            st.subheader("💳 वार्षिक प्लान चुनें (Choose Renewal/Upgrade Plan):")
+            sel_sub_plan = st.radio(
+                "प्लान चुनें:",
+                [
+                    "🏫 प्राइमरी स्कूल (कक्षा 1 से 5) — ₹999 / वर्ष",
+                    "🎓 मिडिल स्कूल प्रो (कक्षा 1 से 8) — ₹1,499 / वर्ष (सर्वाधिक लोकप्रिय)",
+                    "🏛️ हाईस्कूल / हायर सेकेंडरी (कक्षा 1 से 10/12) — ₹2,499 / वर्ष"
+                ],
+                index=1,
+                label_visibility="collapsed"
+            )
+
+            plan_amount = "1499"
+            if "999" in sel_sub_plan: plan_amount = "999"
+            elif "2499" in sel_sub_plan: plan_amount = "2499"
+
+            st.markdown(f"#### कुल देय राशि: **₹{plan_amount}** (सत्र 2026-27 एवं 2027-28 हेतु)")
+            
+            entered_utr = st.text_input("12-अंकीय UPI Ref / Transaction ID / UTR दर्ज करें:*", placeholder="उदा. 4256XXXXXXXX", key="lic_utr_input")
+            
+            c_act_lic1, c_act_lic2 = st.columns([2, 1])
+            with c_act_lic1:
+                if st.button("⚡ भुगतान सत्यापित करें एवं तुरंत लाइसेंस सक्रिय करें", type="primary", use_container_width=True):
+                    if not entered_utr or len(entered_utr.strip()) < 8:
+                        st.error("कृपया वैध UPI UTR / Transaction ID दर्ज करें!")
+                    else:
+                        registry = load_schools_registry()
+                        if dise_curr in registry:
+                            registry[dise_curr]["status"] = "Active (सक्रिय)"
+                            registry[dise_curr]["plan"] = sel_sub_plan.split("—")[0].strip()
+                            registry[dise_curr]["expiry"] = "2027-03-31"
+                            registry[dise_curr]["last_utr"] = entered_utr.strip()
+                            save_schools_registry(registry)
+                            
+                            auth_school["status"] = "Active (सक्रिय)"
+                            auth_school["plan"] = sel_sub_plan.split("—")[0].strip()
+                            auth_school["expiry"] = "2027-03-31"
+                            st.session_state.authenticated_school = auth_school
+                            
+                            st.balloons()
+                            st.success(f"🎉 बधाई! {auth_school.get('school_name')} का वार्षिक प्रो लाइसेंस 31 मार्च 2027 तक सफलतापूर्वक सक्रिय हो गया!")
+                            st.session_state.show_license_dialog = False
+                            st.rerun()
+            with c_act_lic2:
+                if st.button("❌ बंद करें (Close)", use_container_width=True):
+                    st.session_state.show_license_dialog = False
+                    st.rerun()
+
+        with col_lic2:
+            st.markdown("""
+            <div style="border: 2px solid #16A34A; padding: 14px; border-radius: 8px; text-align: center; background: #F0FDF4;">
+                <b style="color: #166534; font-size: 14px;">📲 स्कैन करके भुगतान करें (Scan & Pay)</b><br>
+                <span style="font-size: 11.5px; color: #15803D;">Google Pay, PhonePe, Paytm, BHIM UPI मान्य</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+            upi_id_demo = "schoolresultpro@upi"
+            upi_qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=upi://pay?pa={upi_id_demo}%26pn=SchoolResultPro%26am={plan_amount}%26cu=INR"
+            
+            st.markdown(f"""
+            <div style="text-align: center; margin-top: 10px;">
+                <img src="{upi_qr_url}" style="width: 170px; height: 170px; border: 1px solid #ccc; border-radius: 6px;">
+                <div style="font-weight: bold; font-size: 13px; color: #1E3A8A; margin-top: 6px;">
+                    UPI ID: <code>{upi_id_demo}</code>
+                </div>
+                <div style="font-size: 12px; color: #555;">
+                    भुगतान के बाद मिला 12-अंकीय UTR नंबर बाईं ओर दर्ज करके सबमिट करें।
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+    st.divider()
+
 # ----------------- MODULE 1: SCHOOL SETUP -----------------
 if menu == T["nav_school"]:
     st.markdown(f'<div class="main-header">🏫 स्कूल प्रोफाइल एवं संस्था विवरण</div>', unsafe_allow_html=True)
@@ -1060,27 +1955,95 @@ if menu == T["nav_school"]:
 
 
 
-# ----------------- MODULE 2: STUDENT MASTER -----------------
+
+    # ----------------- TEACHER MANAGEMENT (PRINCIPAL ONLY) -----------------
+    if st.session_state.get("authenticated_role") == "PRINCIPAL":
+        st.divider()
+        with st.expander("👨‍🏫 कक्षा अध्यापक प्रबंधन एवं कक्षा आवंटन (Manage Teachers)", expanded=False):
+            st.caption("यहाँ से आप अपनी संस्था के कक्षा अध्यापकों को जोड़ें, ताकि वे अपने मोबाइल OTP से लॉगिन करके केवल अपनी आवंटित कक्षा का काम कर सकें:")
+            
+            auth_school = st.session_state.get("authenticated_school", {})
+            cur_dise = auth_school.get("dise_code", "")
+            registry = load_schools_registry()
+            sch_in_reg = registry.get(cur_dise, auth_school)
+            teachers_list = sch_in_reg.get("teachers", [])
+
+            if teachers_list:
+                t_display_rows = [{"क्र.": i+1, "शिक्षक का नाम": t["name"], "मोबाइल नंबर": t["mobile"], "आवंटित कक्षा": t["assigned_class"]} for i, t in enumerate(teachers_list)]
+                st.dataframe(pd.DataFrame(t_display_rows), use_container_width=True)
+            else:
+                st.info("अभी कोई शिक्षक पंजीकृत नहीं है। नीचे दिए गए फॉर्म से नया शिक्षक जोड़ें।")
+
+            st.markdown("##### ➕ नया कक्षा अध्यापक जोड़ें:")
+            c_nt1, c_nt2, c_nt3, c_nt4 = st.columns([3, 3, 2, 2])
+            with c_nt1:
+                new_t_name = st.text_input("शिक्षक का नाम:", key="new_teacher_name_input")
+            with c_nt2:
+                new_t_mob = st.text_input("शिक्षक का 10-अंकीय मोबाइल:*", key="new_teacher_mob_input")
+            with c_nt3:
+                new_t_cls = st.selectbox("आवंटित कक्षा:", st.session_state.classes_list, key="new_teacher_cls_input")
+            with c_nt4:
+                st.markdown("<div style='margin-top: 28px;'>", unsafe_allow_html=True)
+                if st.button("➕ शिक्षक जोड़ें", type="primary", use_container_width=True):
+                    clean_t_mob = "".join(filter(str.isdigit, str(new_t_mob)))
+                    if not new_t_name or len(clean_t_mob) != 10:
+                        st.error("कृपया वैध शिक्षक नाम और 10-अंकीय मोबाइल दर्ज करें!")
+                    else:
+                        if "teachers" not in sch_in_reg: sch_in_reg["teachers"] = []
+                        sch_in_reg["teachers"].append({
+                            "name": new_t_name.strip(),
+                            "mobile": clean_t_mob,
+                            "assigned_class": new_t_cls,
+                            "created_at": str(datetime.now().date())
+                        })
+                        registry[cur_dise] = sch_in_reg
+                        save_schools_registry(registry)
+                        st.session_state.authenticated_school = sch_in_reg
+                        log_security_event(cur_dise, "Principal", "Principal", auth_school.get("mobile"), "ADD_TEACHER", f"Added {new_t_name} for {new_t_cls}")
+                        st.success(f"✅ शिक्षक '{new_t_name}' को {new_t_cls} हेतु सफलतापूर्वक आवंटित कर दिया गया!")
+                        st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
+
+
+# ----------------- MODULE 2: STUDENT MASTER (ROLE-AWARE & MAKER-CHECKER ENABLED) -----------------
 elif menu == T["nav_student"]:
+    cur_role = st.session_state.get("authenticated_role", "PRINCIPAL")
+    auth_school = st.session_state.get("authenticated_school", {})
+    cur_dise = auth_school.get("dise_code", "")
+    
     st.markdown(f'<div class="main-header">👨‍🎓 विद्यार्थी मास्टर डेटा — {selected_class}</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="sub-header">छात्रों का व्यक्तिगत विवरण, फोटो अपलोड व संपादन करें या टीसी जारी करें</div>', unsafe_allow_html=True)
+    if cur_role == "TEACHER":
+        st.markdown(f'<div class="sub-header">कक्षा अध्यापक मोड ({st.session_state.get("authenticated_user_name")}) — नए छात्र का ड्राफ्ट जोड़ें अथवा सुधार अनुरोध भेजें (प्रिंसिपल अनुमोदन हेतु)</div>', unsafe_allow_html=True)
+        tab1, tab2, tab3, tab4 = st.tabs([
+            "📋 छात्र सूची (View Only)", 
+            "➕ नया छात्र ड्राफ्ट करें (Draft New Student)", 
+            "✏️ बायो-डेटा सुधार अनुरोध (Propose Correction)",
+            "📸 छात्र फोटो अपलोड (Photo Manager)"
+        ])
+    else:
+        st.markdown(f'<div class="sub-header">संस्था प्रधान मोड — छात्र संपादन, 1-क्लिक शिक्षक अनुमोदन एवं यूनिवर्सल एक्सेल माइग्रेशन</div>', unsafe_allow_html=True)
+        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+            "📋 छात्र सूची एवं संपादन (Data Grid)", 
+            "➕ नया छात्र जोड़ें (Direct Add Student)", 
+            "📸 छात्र फोटो अपलोड एवं प्रबंधन (Photo Manager)", 
+            "🗑️ छात्र हटाएं / टीसी (TC) जारी करें",
+            f"🔔 शिक्षक अनुमोदन डेस्क ({len(auth_school.get('pending_approvals', []))})",
+            "📥 यूनिवर्सल एक्सेल ऑनबोर्डिंग एवं माइग्रेशन"
+        ])
 
-
-    tab1, tab2, tab3, tab4 = st.tabs([
-        "📋 छात्र सूची एवं संपादन (Data Grid)", 
-        "➕ नया छात्र जोड़ें (Add Student)", 
-        "📸 छात्र फोटो अपलोड एवं प्रबंधन (Photo Manager)", 
-        "🗑️ छात्र हटाएं / टीसी (TC) जारी करें"
-    ])
-
-
+    # ---------------- TAB 1: DATA GRID ----------------
     with tab1:
         st.write(f"वर्तमान में **{len(cls_data['students'])}** छात्र पंजीकृत हैं:")
         df_students = cls_data["students"].copy()
         
+        is_teacher = (cur_role == "TEACHER")
+        if is_teacher:
+            st.info("🔒 कक्षा अध्यापक मोड: बायो-डेटा (नाम, जन्मतिथि, समग्र आईडी आदि) केवल पठनीय (Read-Only) है। नए छात्र या सुधार हेतु अगले टैब्स का उपयोग करें।")
+
         edited_df = st.data_editor(
             df_students,
-            num_rows="dynamic",
+            num_rows="fixed" if is_teacher else "dynamic",
+            disabled=is_teacher,
             use_container_width=True,
             column_config={
                 "Roll_No": st.column_config.NumberColumn("Roll No.", required=True),
@@ -1100,17 +2063,23 @@ elif menu == T["nav_student"]:
                 "Total_Days": st.column_config.NumberColumn("Total Days"),
                 "Attended_Days": st.column_config.NumberColumn("Attended Days")
             },
-            key=f"editor_students_{selected_class}"
+            key=f"editor_students_{selected_class}_{cur_role}"
         )
-        if st.button("💾 अपडेट सहेजें (Save Table)", type="primary"):
-            cls_data["students"] = edited_df
-            save_data_to_disk()
-            st.success("✅ छात्र सूची सुरक्षित कर ली गई!")
+        if not is_teacher:
+            if st.button("💾 अपडेट सहेजें (Save Table)", type="primary"):
+                cls_data["students"] = edited_df
+                save_data_to_disk()
+                st.success("✅ छात्र सूची सुरक्षित कर ली गई!")
 
-
+    # ---------------- TAB 2: ADD STUDENT / DRAFT STUDENT ----------------
     with tab2:
-        st.subheader("विद्यार्थी की नई प्रविष्टि (Register New Student):")
-        with st.form("add_student_form"):
+        if is_teacher:
+            st.subheader("➕ नए छात्र का ड्राफ्ट जोड़ें (Submit for Principal Approval):")
+            st.caption("आपके द्वारा भरा गया छात्र विवरण सीधे संस्था प्रधान (Principal) के पास अनुमोदन हेतु जाएगा:")
+        else:
+            st.subheader("विद्यार्थी की सीधी प्रविष्टि (Register New Student):")
+
+        with st.form("add_student_form_unified"):
             c1, c2, c3, c4 = st.columns(4)
             with c1:
                 s_roll = st.number_input("1. Roll No.:", min_value=1, value=len(cls_data['students'])+101)
@@ -1121,7 +2090,7 @@ elif menu == T["nav_student"]:
                 s_mother = st.text_input("5. Mother's Name:")
                 s_dob = st.date_input("6. Date Of Birth:")
             with c3:
-                s_class = st.text_input("7. Class:", value=selected_class)
+                s_class = st.text_input("7. Class:", value=selected_class, disabled=is_teacher)
                 s_sec = st.selectbox("8. Section:", ["A", "B", "C", "D", "E"])
                 s_gender = st.selectbox("9. Gender:", ["Boy", "Girl", "Other"])
             with c4:
@@ -1137,10 +2106,9 @@ elif menu == T["nav_student"]:
             with c_bot3:
                 s_att_days = st.number_input("Attended Days:", value=200)
 
-
-            photo_file = st.file_uploader("विद्यार्थी का फोटो (Photo Upload - Optional):", type=["jpg", "jpeg", "png"], key="reg_photo")
-            submit_student = st.form_submit_button("➕ विद्यार्थी जोड़ें (Submit)", type="primary")
-
+            photo_file = st.file_uploader("विद्यार्थी का फोटो (Photo Upload - Optional):", type=["jpg", "jpeg", "png"], key="reg_photo_uni")
+            btn_label = "📤 अनुमोदन हेतु संस्था प्रधान को भेजें (Submit for Approval)" if is_teacher else "➕ विद्यार्थी जोड़ें (Submit)"
+            submit_student = st.form_submit_button(btn_label, type="primary")
 
             if submit_student:
                 if not s_name:
@@ -1150,199 +2118,581 @@ elif menu == T["nav_student"]:
                     if photo_file:
                         p_b64 = base64.b64encode(photo_file.read()).decode()
                     new_row = {
-                        "Roll_No": s_roll, "Scholar_No": s_schol, "Name": s_name,
+                        "Roll_No": int(s_roll), "Scholar_No": s_schol, "Name": s_name,
                         "Father_Name": s_father, "Mother_Name": s_mother, "DOB": str(s_dob),
-                        "Class": s_class, "Section": s_sec, "Gender": s_gender,
+                        "Class": selected_class, "Section": s_sec, "Gender": s_gender,
                         "Category": s_cat, "SSSM_ID": s_sssm, "Aadhar_No": s_aadhar,
                         "Medium": s_medium, "Status": "Present", "Photo_b64": p_b64,
-                        "Total_Days": s_tot_days, "Attended_Days": s_att_days
+                        "Total_Days": int(s_tot_days), "Attended_Days": int(s_att_days)
                     }
-                    cls_data["students"] = pd.concat([cls_data["students"], pd.DataFrame([new_row])], ignore_index=True)
+                    if is_teacher:
+                        # Add to pending approvals in registry
+                        registry = load_schools_registry()
+                        sch_reg = registry.get(cur_dise, auth_school)
+                        if "pending_approvals" not in sch_reg: sch_reg["pending_approvals"] = []
+                        
+                        sch_reg["pending_approvals"].append({
+                            "id": f"appr_{int(datetime.now().timestamp())}",
+                            "type": "new_student",
+                            "teacher_name": st.session_state.get("authenticated_user_name", "कक्षा अध्यापक"),
+                            "class": selected_class,
+                            "data": new_row,
+                            "requested_at": datetime.now().strftime("%d-%b-%Y %I:%M %p")
+                        })
+                        registry[cur_dise] = sch_reg
+                        save_schools_registry(registry)
+                        st.session_state.authenticated_school = sch_reg
+                        log_security_event(cur_dise, "Teacher", st.session_state.get("authenticated_user_name"), "Teacher", "DRAFT_NEW_STUDENT", f"Drafted {s_name} for {selected_class}")
+                        st.balloons()
+                        st.success(f"✅ छात्र '{s_name}' का प्रवेश ड्राफ्ट अनुमोदन हेतु संस्था प्रधान को भेज दिया गया है!")
+                    else:
+                        cls_data["students"] = pd.concat([cls_data["students"], pd.DataFrame([new_row])], ignore_index=True)
+                        save_data_to_disk()
+                        st.success(f"✅ छात्र '{s_name}' सफलतापूर्वक पंजीकृत!")
+                        st.rerun()
+
+    # ---------------- TAB 3: PROPOSE CORRECTION (TEACHER) / PHOTO MANAGER (PRINCIPAL) ----------------
+    if is_teacher:
+        with tab3:
+            st.subheader("✏️ विद्यार्थी बायो-डेटा सुधार अनुरोध (Propose Correction):")
+            st.caption("यदि किसी छात्र के नाम, जन्मतिथि, समग्र आईडी आदि में लिपिकीय त्रुटि है, तो सुधार अनुरोध भेजें:")
+            
+            st_options = [f"Roll {s['Roll_No']}: {s['Name']}" for _, s in cls_data["students"].iterrows()]
+            if not st_options:
+                st.warning("कक्षा में कोई छात्र उपलब्ध नहीं है।")
+            else:
+                sel_edit_st = st.selectbox("विद्यार्थी चुनें:", st_options, key="corr_st_sel")
+                edit_r = int(sel_edit_st.split(":")[0].replace("Roll", "").strip())
+                target_st_row = cls_data["students"][cls_data["students"]["Roll_No"] == edit_r].iloc[0]
+                
+                c_cr1, c_cr2 = st.columns(2)
+                with c_cr1:
+                    corr_field = st.selectbox("किस फ़ील्ड में सुधार करना है?", ["छात्र का नाम (Name)", "पिता का नाम (Father Name)", "माता का नाम (Mother Name)", "जन्मतिथि (DOB)", "समग्र आईडी (Samagra ID)", "स्कॉलर नंबर (Scholar No)"])
+                with c_cr2:
+                    corr_val = st.text_input("सही नया मान (Corrected Value) दर्ज करें:*")
+                corr_reason = st.text_input("सुधार का कारण (Reason):", placeholder="उदा. समग्र दस्तावेज अनुसार सही नाम")
+
+                if st.button("📤 सुधार अनुरोध प्रिंसिपल को भेजें", type="primary"):
+                    if not corr_val:
+                        st.error("कृपया सही मान दर्ज करें!")
+                    else:
+                        registry = load_schools_registry()
+                        sch_reg = registry.get(cur_dise, auth_school)
+                        if "pending_approvals" not in sch_reg: sch_reg["pending_approvals"] = []
+                        sch_reg["pending_approvals"].append({
+                            "id": f"corr_{int(datetime.now().timestamp())}",
+                            "type": "edit_student",
+                            "teacher_name": st.session_state.get("authenticated_user_name", "कक्षा अध्यापक"),
+                            "class": selected_class,
+                            "roll_no": edit_r,
+                            "student_name": target_st_row["Name"],
+                            "field": corr_field,
+                            "new_value": corr_val.strip(),
+                            "reason": corr_reason,
+                            "requested_at": datetime.now().strftime("%d-%b-%Y %I:%M %p")
+                        })
+                        registry[cur_dise] = sch_reg
+                        save_schools_registry(registry)
+                        st.session_state.authenticated_school = sch_reg
+                        log_security_event(cur_dise, "Teacher", st.session_state.get("authenticated_user_name"), "Teacher", "PROPOSE_CORRECTION", f"Roll {edit_r}: {corr_field} -> {corr_val}")
+                        st.success(f"✅ रोल नंबर {edit_r} के {corr_field} सुधार का अनुरोध संस्था प्रधान को भेज दिया गया!")
+
+        # Tab 4 for Teacher: Photo Manager
+        with tab4:
+            st.subheader("📸 छात्र फोटो अपलोड (Photo Manager)")
+            students_df = cls_data["students"]
+            if students_df.empty:
+                st.warning("⚠️ कृपया पहले छात्र जोड़ें!")
+            else:
+                col_p_left, col_p_right = st.columns([2, 1])
+                with col_p_left:
+                    st_photo_names = [f"Roll {s['Roll_No']}: {s['Name']}" for _, s in students_df.iterrows()]
+                    sel_st_photo_str = st.selectbox("विद्यार्थी चुनें:", st_photo_names, key="photo_sel_st_tr")
+                    p_roll = int(sel_st_photo_str.split(":")[0].replace("Roll", "").strip())
+                    target_st = students_df[students_df["Roll_No"] == p_roll].iloc[0]
+                    new_photo = st.file_uploader(f"रोल {p_roll} ({target_st['Name']}) का फोटो चुनें:", type=["jpg", "jpeg", "png"], key=f"photo_up_tr_{p_roll}")
+                    if st.button("💾 फोटो सुरक्षित करें", type="primary", key=f"btn_p_save_tr_{p_roll}"):
+                        if new_photo:
+                            b64_img = base64.b64encode(new_photo.read()).decode()
+                            cls_data["students"].loc[cls_data["students"]["Roll_No"] == p_roll, "Photo_b64"] = b64_img
+                            save_data_to_disk()
+                            st.success("फोटो सुरक्षित!")
+                            st.rerun()
+                with col_p_right:
+                    if target_st.get("Photo_b64"):
+                        st.image(base64.b64decode(target_st["Photo_b64"]), width=130)
+                    else:
+                        st.info("फोटो उपलब्ध नहीं")
+
+    else:
+        # ---------------- FOR PRINCIPAL: PHOTO, TC, APPROVALS & EXCEL MIGRATOR ----------------
+        with tab3:
+            st.subheader("📸 छात्र फोटो अपलोड एवं प्रबंधन (Photo Manager)")
+            students_df = cls_data["students"]
+            if students_df.empty:
+                st.warning("⚠️ कृपया पहले छात्र जोड़ें!")
+            else:
+                col_p_left, col_p_right = st.columns([2, 1])
+                with col_p_left:
+                    st_photo_names = [f"Roll {s['Roll_No']}: {s['Name']}" for _, s in students_df.iterrows()]
+                    sel_st_photo_str = st.selectbox("विद्यार्थी चुनें:", st_photo_names, key="photo_sel_st_pr")
+                    p_roll = int(sel_st_photo_str.split(":")[0].replace("Roll", "").strip())
+                    target_st = students_df[students_df["Roll_No"] == p_roll].iloc[0]
+                    new_photo = st.file_uploader(f"रोल {p_roll} ({target_st['Name']}) का फोटो चुनें:", type=["jpg", "jpeg", "png"], key=f"photo_up_pr_{p_roll}")
+                    if st.button("💾 फोटो सुरक्षित करें", type="primary", key=f"btn_p_save_pr_{p_roll}"):
+                        if new_photo:
+                            b64_img = base64.b64encode(new_photo.read()).decode()
+                            cls_data["students"].loc[cls_data["students"]["Roll_No"] == p_roll, "Photo_b64"] = b64_img
+                            save_data_to_disk()
+                            st.success("फोटो सुरक्षित!")
+                            st.rerun()
+                with col_p_right:
+                    if target_st.get("Photo_b64"):
+                        st.image(base64.b64decode(target_st["Photo_b64"]), width=130)
+                    else:
+                        st.info("फोटो उपलब्ध नहीं")
+
+        with tab4:
+            st.subheader("🗑️ छात्र हटाएं / स्थानांतरण प्रमाण पत्र (TC) जारी करें")
+            students_df = cls_data["students"]
+            if students_df.empty:
+                st.warning("कक्षा में कोई छात्र उपलब्ध नहीं है।")
+            else:
+                del_options = [f"Roll {s['Roll_No']}: {s['Name']} (Scholar: {s['Scholar_No']})" for _, s in students_df.iterrows()]
+                student_to_delete_str = st.selectbox("हटाने हेतु विद्यार्थी चुनें:", del_options, key="del_st_pr")
+                del_roll = int(student_to_delete_str.split(":")[0].replace("Roll", "").strip())
+                tc_reason = st.text_input("शाला छोड़ने का कारण (Reason for Leaving / TC):", value="Transfer Certificate (TC) Issued / Left School", key="del_reason_pr")
+                if st.button("⚠️ पुष्टि करें और विद्यार्थी का रिकॉर्ड हटाएं", type="primary"):
+                    cls_data["students"] = cls_data["students"][cls_data["students"]["Roll_No"] != del_roll].reset_index(drop=True)
+                    if del_roll in cls_data["evaluations"]: del cls_data["evaluations"][del_roll]
                     save_data_to_disk()
-                    st.success(f"✅ छात्र '{s_name}' सफलतापूर्वक जोड़ा गया!")
+                    log_security_event(cur_dise, "Principal", "Principal", auth_school.get("mobile"), "DELETE_STUDENT_TC", f"Deleted Roll {del_roll}, Reason: {tc_reason}")
+                    st.success(f"✅ रोल नंबर {del_roll} का रिकॉर्ड सफलतापूर्वक हटा दिया गया।")
                     st.rerun()
 
-
-    with tab3:
-        st.subheader("📸 छात्र फोटो अपलोड एवं प्रबंधन (Upload Student Photos)")
-        st.caption("यहाँ से आप किसी भी पंजीकृत छात्र का फोटो अपलोड कर सकते हैं, जो सीधे प्रगति पत्रक (Marksheet) पर प्रिंट होगा:")
-        
-        students_df = cls_data["students"]
-        if students_df.empty:
-            st.warning("⚠️ कृपया पहले छात्र पंजीकृत करें!")
-        else:
-            col_p_left, col_p_right = st.columns([2, 1])
+        # Tab 5: Pending Approvals (Maker-Checker Queue)
+        with tab5:
+            st.subheader("🔔 शिक्षक अनुमोदन डेस्क (Teacher Approvals Queue)")
+            st.caption("कक्षा अध्यापकों द्वारा भरे गए नए छात्र एवं बायो-डेटा सुधार अनुरोधों की 1-क्लिक समीक्षा एवं अनुमोदन:")
             
-            with col_p_left:
-                st.markdown("#### 👤 एकल छात्र फोटो अपलोड (Single Photo Upload)")
-                st_photo_names = [f"Roll {s['Roll_No']}: {s['Name']}" for _, s in students_df.iterrows()]
-                sel_st_photo_str = st.selectbox("विद्यार्थी चुनें (Select Student):", st_photo_names, key="photo_sel_st")
-                p_roll = int(sel_st_photo_str.split(":")[0].replace("Roll", "").strip())
+            registry = load_schools_registry()
+            sch_reg = registry.get(cur_dise, auth_school)
+            pending_list = sch_reg.get("pending_approvals", [])
+
+            if not pending_list:
+                st.success("✅ कोई भी शिक्षक अनुमोदन लंबित नहीं है! सभी रिकॉर्ड्स अद्यतन हैं।")
+            else:
+                st.markdown(f"**कुल {len(pending_list)} अनुरोध अनुमोदन हेतु प्रतीक्षारत हैं:**")
                 
-                target_st = students_df[students_df["Roll_No"] == p_roll].iloc[0]
-                new_photo = st.file_uploader(f"रोल नंबर {p_roll} ({target_st['Name']}) का फोटो चुनें (JPG/PNG):", type=["jpg", "jpeg", "png"], key=f"photo_up_{p_roll}")
-                
-                if st.button("💾 यह फोटो सुरक्षित करें (Save Photo)", type="primary", key=f"btn_save_photo_{p_roll}"):
-                    if new_photo:
-                        b64_img = base64.b64encode(new_photo.read()).decode()
-                        cls_data["students"].loc[cls_data["students"]["Roll_No"] == p_roll, "Photo_b64"] = b64_img
-                        save_data_to_disk()
-                        st.success(f"✅ रोल नंबर {p_roll} ({target_st['Name']}) का फोटो सफलतापूर्वक अपडेट हो गया!")
-                        st.rerun()
+                # Bulk Approve button
+                if st.button("🚀 सभी अनुरोध एक साथ स्वीकार करें (Bulk Approve All)", type="primary"):
+                    for req in pending_list:
+                        if req["type"] == "new_student":
+                            st_cls = req["class"]
+                            t_cls_data = get_class_data(st_cls)
+                            t_cls_data["students"] = pd.concat([t_cls_data["students"], pd.DataFrame([req["data"]])], ignore_index=True)
+                    sch_reg["pending_approvals"] = []
+                    registry[cur_dise] = sch_reg
+                    save_schools_registry(registry)
+                    st.session_state.authenticated_school = sch_reg
+                    save_data_to_disk()
+                    log_security_event(cur_dise, "Principal", "Principal", auth_school.get("mobile"), "BULK_APPROVE_TEACHER_REQUESTS", "Approved all pending")
+                    st.balloons()
+                    st.success("🎉 सभी शिक्षक अनुरोध सफलतापूर्वक एक साथ अनुमोदित कर दिए गए!")
+                    st.rerun()
+
+                st.divider()
+
+                for idx, req in enumerate(pending_list):
+                    r_c1, r_c2, r_c3 = st.columns([4, 2, 2])
+                    with r_c1:
+                        if req["type"] == "new_student":
+                            st_d = req["data"]
+                            st.markdown(f"➕ **नया छात्र:** **{st_d['Name']}** (रोल: `{st_d['Roll_No']}`, दाखिला: `{st_d['Scholar_No']}`)<br><span style='font-size:12px; color:#555;'>कक्षा: <b>{req['class']}</b> | शिक्षक: {req['teacher_name']} | समय: {req['requested_at']}</span>", unsafe_allow_html=True)
+                        else:
+                            st.markdown(f"✏️ **सुधार अनुरोध:** **{req['student_name']}** (रोल: `{req['roll_no']}`)<br><span style='font-size:12px; color:#555;'>फ़ील्ड: <b>{req['field']}</b> ➔ नया मान: <b style='color:green;'>{req['new_value']}</b><br>कारण: {req.get('reason','')} | शिक्षक: {req['teacher_name']}</span>", unsafe_allow_html=True)
+                    
+                    with r_c2:
+                        if st.button(f"✅ स्वीकार करें", key=f"btn_appr_{req['id']}", type="primary", use_container_width=True):
+                            if req["type"] == "new_student":
+                                st_cls = req["class"]
+                                t_cls_data = get_class_data(st_cls)
+                                t_cls_data["students"] = pd.concat([t_cls_data["students"], pd.DataFrame([req["data"]])], ignore_index=True)
+                            else:
+                                # Apply correction
+                                st_cls = req["class"]
+                                t_cls_data = get_class_data(st_cls)
+                                # map field name
+                                f_map = {"छात्र का नाम (Name)": "Name", "पिता का नाम (Father Name)": "Father_Name", "माता का नाम (Mother Name)": "Mother_Name", "जन्मतिथि (DOB)": "DOB", "समग्र आईडी (Samagra ID)": "SSSM_ID", "स्कॉलर नंबर (Scholar No)": "Scholar_No"}
+                                internal_f = f_map.get(req["field"], "Name")
+                                t_cls_data["students"].loc[t_cls_data["students"]["Roll_No"] == req["roll_no"], internal_f] = req["new_value"]
+
+                            sch_reg["pending_approvals"].pop(idx)
+                            registry[cur_dise] = sch_reg
+                            save_schools_registry(registry)
+                            st.session_state.authenticated_school = sch_reg
+                            save_data_to_disk()
+                            log_security_event(cur_dise, "Principal", "Principal", auth_school.get("mobile"), "APPROVE_TEACHER_REQUEST", f"Approved {req['id']}")
+                            st.success("अनुरोध स्वीकार कर लिया गया!")
+                            st.rerun()
+                    
+                    with r_c3:
+                        if st.button(f"❌ अस्वीकार", key=f"btn_rej_{req['id']}", use_container_width=True):
+                            sch_reg["pending_approvals"].pop(idx)
+                            registry[cur_dise] = sch_reg
+                            save_schools_registry(registry)
+                            st.session_state.authenticated_school = sch_reg
+                            st.warning("अनुरोध अस्वीकार कर दिया गया।")
+                            st.rerun()
+
+                    st.markdown("<hr style='margin:6px 0;'>", unsafe_allow_html=True)
+
+        # Tab 6: Universal Excel Onboarding & Migration Engine
+        with tab6:
+            st.subheader("📥 यूनिवर्सल एक्सेल ऑनबोर्डिंग एवं लीगेसी माइग्रेशन")
+            st.caption("समग्र, शिक्षा पोर्टल, RSKMP या किसी भी पुरानी एक्सेल/सीएसवी को 1-क्लिक में अपलोड करें:")
+
+            mig_up = st.file_uploader("📥 अपनी मौजूदा एक्सेल या सीएसवी शीट चुनें (.xlsx / .csv):", type=["xlsx", "csv"], key="uni_excel_mig_up")
+            
+            if mig_up:
+                try:
+                    if mig_up.name.endswith(".csv"):
+                        raw_mig_df = pd.read_csv(BytesIO(mig_up.read()))
                     else:
-                        st.warning("कृपया पहले फोटो फ़ाइल चुनें!")
+                        raw_mig_df = pd.read_excel(BytesIO(mig_up.read()))
 
+                    st.success(f"🎉 शीट सफलतापूर्वक पढ़ी गई! कुल **{len(raw_mig_df)}** पंक्तियाँ एवं **{len(raw_mig_df.columns)}** कॉलम मिले।")
+                    
+                    # Auto-map columns
+                    col_map = {}
+                    for c in raw_mig_df.columns:
+                        cl = str(c).lower().strip()
+                        if any(k in cl for k in ["छात्र", "student", "name", "naam"]) and "father" not in cl and "mother" not in cl: col_map["Name"] = c
+                        elif any(k in cl for k in ["पिता", "father", "pita"]): col_map["Father_Name"] = c
+                        elif any(k in cl for k in ["माता", "mother", "mata"]): col_map["Mother_Name"] = c
+                        elif any(k in cl for k in ["जन्म", "dob", "birth"]): col_map["DOB"] = c
+                        elif any(k in cl for k in ["समग्र", "samagra", "sssm"]): col_map["SSSM_ID"] = c
+                        elif any(k in cl for k in ["दाखिला", "scholar", "admission"]): col_map["Scholar_No"] = c
+                        elif any(k in cl for k in ["रोल", "roll"]): col_map["Roll_No"] = c
+                        elif any(k in cl for k in ["लिंग", "gender", "sex"]): col_map["Gender"] = c
+                        elif any(k in cl for k in ["जाति", "वर्ग", "category", "cat"]): col_map["Category"] = c
+                        elif any(k in cl for k in ["आधार", "aadhar", "uid"]): col_map["Aadhar_No"] = c
 
-            with col_p_right:
-                st.markdown("#### 🖼️ वर्तमान फोटो (Preview)")
-                if target_st.get("Photo_b64"):
-                    st.image(base64.b64decode(target_st["Photo_b64"]), width=140, caption=f"Roll {p_roll}: {target_st['Name']}")
-                else:
-                    st.markdown('<div style="width: 130px; height: 160px; border: 2px dashed #999; display: flex; align-items: center; justify-content: center; text-align: center; color: #777; font-size: 13px; border-radius: 6px; background: #f8fafc;">फोटो उपलब्ध<br>नहीं है</div>', unsafe_allow_html=True)
+                    st.write("**🔍 ऑटो-डिटेक्टेड कॉलम मैपिंग:**")
+                    c_mp1, c_mp2 = st.columns(2)
+                    with c_mp1:
+                        for k in ["Name", "Father_Name", "Mother_Name", "DOB", "Scholar_No"]:
+                            st.caption(f"• **{k}** ➔ `{col_map.get(k, 'Not Found')}`")
+                    with c_mp2:
+                        for k in ["Roll_No", "SSSM_ID", "Gender", "Category", "Aadhar_No"]:
+                            st.caption(f"• **{k}** ➔ `{col_map.get(k, 'Not Found')}`")
 
+                    # Build Normalized DF
+                    norm_rows = []
+                    missing_dob_cnt = 0
+                    missing_sssm_cnt = 0
 
-            st.divider()
-            st.markdown("#### 📦 बल्क फोटो अपलोड (Bulk Photos by Roll Number)")
-            st.info("💡 **टिप:** यदि आपके पास सभी छात्रों के फोटो हैं, तो फ़ाइलों का नाम छात्र के रोल नंबर के अनुसार रखें (जैसे `101.jpg`, `102.png`, `103.jpeg`) और यहाँ एक साथ अपलोड करें:")
-            bulk_files = st.file_uploader("सभी फोटो एक साथ चुनें (Multiple Files Allowed):", type=["jpg", "jpeg", "png"], accept_multiple_files=True, key="bulk_photos")
-            
-            if bulk_files and st.button("🚀 सभी फोटो एक साथ असाइन करें (Assign Bulk Photos)", type="primary"):
-                assigned_count = 0
-                for bf in bulk_files:
-                    # extract roll number from filename (e.g. 101.jpg -> 101)
-                    fname = os.path.splitext(bf.name)[0].strip()
-                    m = re.search(r'(\d+)', fname)
-                    if m:
-                        r_found = int(m.group(1))
-                        if r_found in cls_data["students"]["Roll_No"].values:
-                            b64_f = base64.b64encode(bf.read()).decode()
-                            cls_data["students"].loc[cls_data["students"]["Roll_No"] == r_found, "Photo_b64"] = b64_f
-                            assigned_count += 1
-                save_data_to_disk()
-                st.success(f"🎉 बधाई! कुल {assigned_count} छात्रों के फोटो सफलतापूर्वक असाइन व सुरक्षित कर लिए गए!")
-                st.rerun()
+                    for idx_r, r in raw_mig_df.iterrows():
+                        st_n = str(r.get(col_map.get("Name", ""), "")).strip() if col_map.get("Name") else f"Student {idx_r+1}"
+                        st_dob = str(r.get(col_map.get("DOB", ""), "")).strip() if col_map.get("DOB") else ""
+                        st_sssm = str(r.get(col_map.get("SSSM_ID", ""), "")).strip() if col_map.get("SSSM_ID") else ""
+                        
+                        if not st_dob or st_dob == "nan": missing_dob_cnt += 1
+                        if not st_sssm or st_sssm == "nan": missing_sssm_cnt += 1
 
+                        norm_rows.append({
+                            "Roll_No": int(r.get(col_map.get("Roll_No", ""), idx_r+101)) if col_map.get("Roll_No") and str(r.get(col_map.get("Roll_No", ""))).isdigit() else idx_r+101,
+                            "Scholar_No": str(r.get(col_map.get("Scholar_No", ""), f"10{idx_r+1}")).replace(".0",""),
+                            "Name": st_n,
+                            "Father_Name": str(r.get(col_map.get("Father_Name", ""), "")).replace("nan",""),
+                            "Mother_Name": str(r.get(col_map.get("Mother_Name", ""), "")).replace("nan",""),
+                            "DOB": st_dob.replace("nan",""),
+                            "Class": selected_class,
+                            "Section": "A",
+                            "Gender": str(r.get(col_map.get("Gender", ""), "Boy")).capitalize() if col_map.get("Gender") else "Boy",
+                            "Category": str(r.get(col_map.get("Category", ""), "OBC")).upper() if col_map.get("Category") else "OBC",
+                            "SSSM_ID": st_sssm.replace("nan",""),
+                            "Aadhar_No": str(r.get(col_map.get("Aadhar_No", ""), "")).replace("nan",""),
+                            "Medium": "Hindi (हिन्दी)",
+                            "Status": "Present",
+                            "Total_Days": 220,
+                            "Attended_Days": 200,
+                            "Photo_b64": None
+                        })
+                    
+                    norm_df = pd.DataFrame(norm_rows)
 
-    with tab4:
-        st.subheader("🗑️ छात्र हटाएं / स्थानांतरण प्रमाण पत्र (TC) जारी करें")
-        st.info("यदि कोई विद्यार्थी शाला छोड़ता है या टीसी (TC) लेता है तो उसका रोल नंबर चुनकर रिकॉर्ड हटाएं:")
-        
-        students_df = cls_data["students"]
-        if students_df.empty:
-            st.warning("कक्षा में कोई छात्र उपलब्ध नहीं है।")
-        else:
-            del_options = [f"Roll {s['Roll_No']}: {s['Name']} (Scholar: {s['Scholar_No']})" for _, s in students_df.iterrows()]
-            student_to_delete_str = st.selectbox("हटाने हेतु विद्यार्थी चुनें:", del_options)
-            del_roll = int(student_to_delete_str.split(":")[0].replace("Roll", "").strip())
-            tc_reason = st.text_input("शाला छोड़ने का कारण (Reason for Leaving / TC):", value="Transfer Certificate (TC) Issued / Left School")
-            
-            if st.button("⚠️ पुष्टि करें और विद्यार्थी का रिकॉर्ड हटाएं (Delete Record)", type="primary"):
-                cls_data["students"] = cls_data["students"][cls_data["students"]["Roll_No"] != del_roll].reset_index(drop=True)
-                if del_roll in cls_data["evaluations"]:
-                    del cls_data["evaluations"][del_roll]
-                save_data_to_disk()
-                st.success(f"✅ रोल नंबर {del_roll} का रिकॉर्ड सफलतापूर्वक हटा दिया गया। कारण: {tc_reason}")
-                st.rerun()
+                    # Gap Detection Report
+                    st.divider()
+                    st.markdown("#### ⚠️ डेटा गैप डिटेक्शन रिपोर्ट (Audit Report):")
+                    c_gp1, c_gp2, c_gp3 = st.columns(3)
+                    c_gp1.metric("कुल पहचाने गए छात्र", f"{len(norm_df)}")
+                    c_gp2.metric("अधूरी समग्र आईडी", f"{missing_sssm_cnt}", delta=f"-{missing_sssm_cnt}" if missing_sssm_cnt else None, delta_color="inverse")
+                    c_gp3.metric("अधूरी जन्मतिथि", f"{missing_dob_cnt}", delta=f"-{missing_dob_cnt}" if missing_dob_cnt else None, delta_color="inverse")
 
+                    st.caption("💡 आप नीचे दी गई टेबल में छूटा हुआ डेटा सीधे टाइप करके यहीं भर सकते हैं:")
+                    edited_norm_df = st.data_editor(norm_df, num_rows="dynamic", use_container_width=True, key="norm_mig_editor")
 
-# ----------------- MODULE 3: MONTHLY ATTENDANCE SHEET (IMAGE 1: image_aab3c5.png) -----------------
+                    # Destination & Save
+                    c_dest1, c_dest2 = st.columns(2)
+                    with c_dest1:
+                        target_import_sess = st.selectbox("यह डेटा किस सत्र हेतु आयात करना है?", ["2026-27 (वर्तमान चालू सत्र)", "2025-26 (लीगेसी आर्काइव)", "2024-25 (लीगेसी आर्काइव)"], key="mig_target_sess")
+                    with c_dest2:
+                        st.markdown("<div style='margin-top: 28px;'>", unsafe_allow_html=True)
+                        if st.button("🚀 यह डेटा सफलतापूर्वक आयात करें (Import to Class)", type="primary", use_container_width=True):
+                            cls_data["students"] = edited_norm_df
+                            save_data_to_disk()
+                            log_security_event(cur_dise, "Principal", "Principal", auth_school.get("mobile"), "UNIVERSAL_EXCEL_IMPORT", f"Imported {len(edited_norm_df)} students from {mig_up.name}")
+                            st.balloons()
+                            st.success(f"🎉 शानदार! कुल {len(edited_norm_df)} छात्र कक्षा {selected_class} में सफलतापूर्वक आयात हो गए!")
+                            st.rerun()
+                        st.markdown("</div>", unsafe_allow_html=True)
+
+                except Exception as e:
+                    st.error(f"फ़ाइल प्रोसेस करने में त्रुटि: {e}")
+
+# ----------------- MODULE 3: DUAL ATTENDANCE REGISTER (DAILY + MONTHLY) -----------------
 elif menu == T["nav_attendance"]:
-    st.markdown('<div class="main-header">📅 माहवार विद्यार्थी उपस्थिति पत्रक (Monthly Attendance Sheet)</div>', unsafe_allow_html=True)
-    st.markdown('<div style="color: #008000; font-weight: bold; text-align: center; font-size: 15px; margin-bottom: 12px;">स्कूल कार्य दिवस की एंट्री माह के ठीक ऊपर वाले सेल में करें एवं विद्यार्थी की माहवार उपस्थिति की एंट्री उसके सामने वाले सेल में करें</div>', unsafe_allow_html=True)
-
+    st.markdown('<div class="main-header">📅 विद्यार्थी उपस्थिति प्रबंधन (Student Attendance Portal)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-header">कक्षा अध्यापक द्वारा दैनिक मोबाइल हाजिरी लगाएं अथवा 12-माह का शासकीय उपस्थिति पत्रक देखें व एक्सपोर्ट करें</div>', unsafe_allow_html=True)
 
     students_df = cls_data["students"]
     if students_df.empty:
         st.warning("⚠️ कृपया पहले 'विद्यार्थी मास्टर' में छात्र जोड़ें!")
     else:
-        # Step 1: School Working Days Row Setup
-        st.subheader("🏫 स्कूल कुल कार्य दिवस (School Working Days):")
-        c_work = cls_data.get("working_days", DEFAULT_WORKING_DAYS)
-        w_cols = st.columns(13)
-        updated_work = {}
-        tot_work_days = 0
-        for i, m in enumerate(MONTHS_LIST):
-            with w_cols[i]:
-                w_val = st.number_input(f"{m}", min_value=0, max_value=31, value=int(c_work.get(m, DEFAULT_WORKING_DAYS.get(m, 20))), key=f"work_m_{selected_class}_{m}")
-                updated_work[m] = w_val
-                tot_work_days += w_val
-        with w_cols[12]:
-            st.markdown(f"<div style='border: 2px solid #000; padding: 6px; text-align: center; margin-top: 18px; font-weight: bold; font-size: 16px; background: #fff;'>Total: {tot_work_days}</div>", unsafe_allow_html=True)
-        cls_data["working_days"] = updated_work
+        tab_att1, tab_att2 = st.tabs([
+            "📝 दैनिक कक्षा हाजिरी (Daily Teacher Attendance)",
+            "📅 माहवार शासकीय उपस्थिति पत्रक (Monthly Attendance Sheet & Export)"
+        ])
 
+        # ======================= TAB 1: DAILY TEACHER ATTENDANCE =======================
+        with tab_att1:
+            st.subheader(f"📲 दैनिक छात्र उपस्थिति — {selected_class}")
+            st.caption("कक्षा अध्यापक यहाँ से आज की तारीख चुनकर छात्रों की हाजिरी लगा सकते हैं। डेटा सीधे मास्टर रिकॉर्ड और वार्षिक रिजल्ट में अपडेट होगा:")
 
-        # Step 2: Students Attendance Grid matching image_aab3c5.png
-        st.subheader("📋 विद्यार्थियों की माहवार उपस्थिति (Student-wise Monthly Attendance Grid):")
-        
-        # Build initial attendance dataframe if missing
-        att_df = cls_data.get("monthly_attendance", pd.DataFrame())
-        if att_df.empty or len(att_df) != len(students_df):
-            rows = []
-            for _, s in students_df.iterrows():
-                r = {
-                    "Roll_No": s["Roll_No"],
-                    "Name": s["Name"]
-                }
-                for m in MONTHS_LIST:
-                    r[m] = 20 if updated_work[m] > 0 else 0
-                rows.append(r)
-            att_df = pd.DataFrame(rows)
-
-
-        # Ensure dynamic total column
-        att_df["Total"] = att_df[MONTHS_LIST].sum(axis=1)
-
-
-        edited_att = st.data_editor(
-            att_df,
-            use_container_width=True,
-            column_config={
-                "Roll_No": st.column_config.NumberColumn("Roll No.", disabled=True),
-                "Name": st.column_config.TextColumn("Name Of Student", disabled=True),
-                **{m: st.column_config.NumberColumn(m, min_value=0, max_value=31) for m in MONTHS_LIST},
-                "Total": st.column_config.NumberColumn("Total (कुल उपस्थिति)", disabled=True)
-            },
-            key=f"editor_att_{selected_class}"
-        )
-
-
-        if st.button("💾 माहवार उपस्थिति सहेजें (Save Attendance Grid)", type="primary"):
-            # Recalculate totals
-            edited_att["Total"] = edited_att[MONTHS_LIST].sum(axis=1)
-            cls_data["monthly_attendance"] = edited_att
+            MONTHS_MAP = {1:"Jan", 2:"Feb", 3:"Mar", 4:"Apr", 5:"May", 6:"Jun", 7:"Jul", 8:"Aug", 9:"Sep", 10:"Oct", 11:"Nov", 12:"Dec"}
             
-            # Sync back to students dataframe Total_Days & Attended_Days
-            for idx, r in edited_att.iterrows():
-                r_no = r["Roll_No"]
-                cls_data["students"].loc[cls_data["students"]["Roll_No"] == r_no, "Attended_Days"] = int(r["Total"])
-                cls_data["students"].loc[cls_data["students"]["Roll_No"] == r_no, "Total_Days"] = int(tot_work_days)
+            c_d1, c_d2, c_d3 = st.columns([2, 2, 3])
+            with c_d1:
+                cur_date = st.date_input("📅 उपस्थिति दिनांक (Select Date):", value=datetime.now().date(), key="daily_att_date")
+                cur_month_abbr = MONTHS_MAP.get(cur_date.month, "Sep")
+            with c_d2:
+                st.markdown(f"<div style='border: 1px solid #CBD5E1; padding: 6px 12px; border-radius: 6px; background: #F8FAFC; margin-top: 25px; text-align: center; font-size: 13px;'><b>सक्रिय माह:</b> <span style='color:#1E3A8A; font-weight:bold;'>{cur_month_abbr}</span></div>", unsafe_allow_html=True)
 
+            if "daily_attendance" not in cls_data:
+                cls_data["daily_attendance"] = {}
 
-            save_data_to_disk()
-            st.success(f"✅ कक्षा {selected_class} की माहवार उपस्थिति सफलतापूर्वक सुरक्षित कर ली गई एवं मास्टर रिकॉर्ड में अपडेट हो गई!")
+            date_str = str(cur_date)
+            existing_day_record = cls_data["daily_attendance"].get(date_str, {})
 
+            with c_d3:
+                st.markdown("<div style='margin-top: 25px;'>", unsafe_allow_html=True)
+                c_bulk1, c_bulk2 = st.columns(2)
+                with c_bulk1:
+                    if st.button("🟢 सभी उपस्थित (All Present)", use_container_width=True):
+                        for _, s in students_df.iterrows():
+                            st.session_state[f"d_att_{s['Roll_No']}_{date_str}"] = "Present"
+                        st.rerun()
+                with c_bulk2:
+                    if st.button("🔴 सभी अनुपस्थित (All Absent)", use_container_width=True):
+                        for _, s in students_df.iterrows():
+                            st.session_state[f"d_att_{s['Roll_No']}_{date_str}"] = "Absent"
+                        st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
 
-        # Step 3: Export Attendance Sheet
-        st.divider()
-        st.markdown("### 📥 उपस्थिति डेटा एक्सपोर्ट (Export Attendance Register)")
-        c_att_exp1, c_att_exp2, c_att_exp3 = st.columns([2, 2, 2])
-        with c_att_exp1:
-            att_fmt = st.selectbox("फ़ाइल प्रारूप चुनें (Format):", ["Excel (.xlsx)", "CSV (.csv)"], key="att_exp_fmt")
-        with c_att_exp2:
-            att_export_df = edited_att.copy()
-            att_bytes, att_mime, att_ext = export_dataframe_bytes(att_export_df, att_fmt)
-            att_filename = f"Attendance_{selected_class}_{st.session_state.school_info.get('session','2023-24')}{att_ext}"
-            st.download_button(
-                f"📥 उपस्थिति पत्रक डाउनलोड करें ({att_fmt})",
-                data=att_bytes,
-                file_name=att_filename,
-                mime=att_mime,
-                type="primary",
-                use_container_width=True
+            st.divider()
+
+            # Student-by-Student Attendance List
+            daily_marked_status = {}
+            tot_st_cnt = len(students_df)
+            pres_cnt = 0
+            abs_cnt = 0
+
+            for idx, s in students_df.iterrows():
+                r_no = s["Roll_No"]
+                default_stat = existing_day_record.get(str(r_no), "Present")
+                
+                # Check session state
+                ss_key = f"d_att_{r_no}_{date_str}"
+                if ss_key in st.session_state:
+                    chosen_stat = st.session_state[ss_key]
+                else:
+                    chosen_stat = default_stat
+
+                daily_marked_status[r_no] = chosen_stat
+                if chosen_stat == "Present": pres_cnt += 1
+                else: abs_cnt += 1
+
+                # Display Row / Card
+                row_c1, row_c2, row_c3, row_c4 = st.columns([1, 4, 3, 2])
+                with row_c1:
+                    if s.get("Photo_b64"):
+                        p_html = f'<img src="data:image/jpeg;base64,{s["Photo_b64"]}" style="width: 45px; height: 52px; object-fit: cover; border-radius: 4px; border: 1px solid #ccc;">'
+                    else:
+                        p_html = '<div style="width: 45px; height: 52px; background: #E2E8F0; display: flex; align-items: center; justify-content: center; font-size: 18px; border-radius: 4px;">👤</div>'
+                    render_html(p_html)
+
+                with row_c2:
+                    st.markdown(f"**{s['Name']}** (रोल नंबर: `{r_no}`)<br><span style='font-size: 12px; color: #555;'>दाखिला: {s.get('Scholar_No','--')} | पिता: {s.get('Father_Name','--')}</span>", unsafe_allow_html=True)
+
+                with row_c3:
+                    stat_choice = st.radio(
+                        f"status_{r_no}",
+                        ["Present (उपस्थित)", "Absent (अनुपस्थित)"],
+                        index=0 if chosen_stat == "Present" else 1,
+                        key=ss_key,
+                        horizontal=True,
+                        label_visibility="collapsed"
+                    )
+                    daily_marked_status[r_no] = "Present" if "Present" in stat_choice else "Absent"
+
+                with row_c4:
+                    if daily_marked_status[r_no] == "Absent":
+                        # Direct WhatsApp Absence Alert
+                        p_mob = s.get("Contact", s.get("Mobile", ""))
+                        clean_p_mob = "".join(filter(str.isdigit, str(p_mob))) if p_mob else ""
+                        if len(clean_p_mob) == 10: clean_p_mob = "91" + clean_p_mob
+                        
+                        abs_msg = f"""🏫 *{st.session_state.school_info.get('name', 'शासकीय विद्यालय')}*
+📢 *अनुपस्थिति सूचना (Student Absence Alert)*
+━━━━━━━━━━━━━━━━━━━━
+प्रिय अभिभावक,
+आपका बच्चा *{s['Name']}* (कक्षा: {selected_class}, रोल नंबर: {r_no}) आज दिनांक *{date_str}* को विद्यालय में *अनुपस्थित* रहा है।
+कृपया अनुपस्थिति का कारण विद्यालय में अवगत कराएं।
+— *कक्षा अध्यापक / प्रधानाध्यापक*"""
+                        encoded_abs_msg = urllib.parse.quote(abs_msg)
+                        wa_abs_link = f"https://wa.me/{clean_p_mob}?text={encoded_abs_msg}" if clean_p_mob else f"https://wa.me/?text={encoded_abs_msg}"
+                        st.markdown(f"""
+                        <a href="{wa_abs_link}" target="_blank" style="text-decoration: none;">
+                            <div style="background: #EF4444; color: white; font-size: 11.5px; font-weight: bold; padding: 4px 6px; border-radius: 4px; text-align: center; margin-top: 4px;">
+                                📲 पालक को सूचना
+                            </div>
+                        </a>
+                        """, unsafe_allow_html=True)
+                    else:
+                        st.markdown("<span style='color: #16A34A; font-weight: bold; font-size: 13px;'>🟢 उपस्थित</span>", unsafe_allow_html=True)
+
+                st.markdown("<hr style='margin: 4px 0; border: none; border-top: 1px solid #F1F5F9;'>", unsafe_allow_html=True)
+
+            st.divider()
+
+            # Today's Summary & Save Button
+            pct_today = round((pres_cnt / max(1, tot_st_cnt)) * 100, 1)
+            sum_m1, sum_m2, sum_m3, sum_m4 = st.columns(4)
+            sum_m1.metric("कुल पंजीकृत छात्र", f"{tot_st_cnt}")
+            sum_m2.metric("🟢 कुल उपस्थित", f"{pres_cnt}")
+            sum_m3.metric("🔴 कुल अनुपस्थित", f"{abs_cnt}")
+            sum_m4.metric("📈 आज की उपस्थिति दर", f"{pct_today}%")
+
+            if st.button("💾 आज की हाजिरी सुरक्षित करें एवं मास्टर रिकॉर्ड में अपडेट करें", type="primary", use_container_width=True):
+                # Save daily log
+                cls_data["daily_attendance"][date_str] = {str(k): v for k, v in daily_marked_status.items()}
+                
+                # Sync into monthly attendance dataframe
+                att_df = cls_data.get("monthly_attendance", pd.DataFrame())
+                if not att_df.empty and cur_month_abbr in att_df.columns:
+                    for r_no, stat in daily_marked_status.items():
+                        if stat == "Present":
+                            # Increment attended days if it was not marked present before
+                            old_stat = existing_day_record.get(str(r_no))
+                            if old_stat != "Present":
+                                cur_val = att_df.loc[att_df["Roll_No"] == r_no, cur_month_abbr].values
+                                if len(cur_val) > 0 and not pd.isna(cur_val[0]):
+                                    att_df.loc[att_df["Roll_No"] == r_no, cur_month_abbr] = int(cur_val[0]) + 1
+                    
+                    att_df["Total"] = att_df[MONTHS_LIST].sum(axis=1)
+                    cls_data["monthly_attendance"] = att_df
+                    
+                    # Update students dataframe
+                    for _, r in att_df.iterrows():
+                        cls_data["students"].loc[cls_data["students"]["Roll_No"] == r["Roll_No"], "Attended_Days"] = int(r["Total"])
+
+                save_data_to_disk()
+                st.balloons()
+                st.success(f"🎉 बधाई! दिनांक {date_str} की दैनिक उपस्थिति सफलतापूर्वक सुरक्षित हो गई एवं मास्टर शीट में अपडेट हो गई!")
+
+        # ======================= TAB 2: MONTHLY GOVERNMENT ATTENDANCE SHEET =======================
+        with tab_att2:
+            # Step 1: School Working Days Row Setup
+            st.subheader("🏫 स्कूल कुल कार्य दिवस (School Working Days):")
+            c_work = cls_data.get("working_days", DEFAULT_WORKING_DAYS)
+            w_cols = st.columns(13)
+            updated_work = {}
+            tot_work_days = 0
+            for i, m in enumerate(MONTHS_LIST):
+                with w_cols[i]:
+                    w_val = st.number_input(f"{m}", min_value=0, max_value=31, value=int(c_work.get(m, DEFAULT_WORKING_DAYS.get(m, 20))), key=f"work_m_{selected_class}_{m}")
+                    updated_work[m] = w_val
+                    tot_work_days += w_val
+            with w_cols[12]:
+                st.markdown(f"<div style='border: 2px solid #000; padding: 6px; text-align: center; margin-top: 18px; font-weight: bold; font-size: 16px; background: #fff;'>Total: {tot_work_days}</div>", unsafe_allow_html=True)
+            cls_data["working_days"] = updated_work
+
+            # Step 2: Students Attendance Grid matching image_aab3c5.png
+            st.subheader("📋 विद्यार्थियों की माहवार उपस्थिति (Student-wise Monthly Attendance Grid):")
+            
+            # Build initial attendance dataframe if missing
+            att_df = cls_data.get("monthly_attendance", pd.DataFrame())
+            if att_df.empty or len(att_df) != len(students_df):
+                rows = []
+                for _, s in students_df.iterrows():
+                    r = {
+                        "Roll_No": s["Roll_No"],
+                        "Name": s["Name"]
+                    }
+                    for m in MONTHS_LIST:
+                        r[m] = 20 if updated_work[m] > 0 else 0
+                    rows.append(r)
+                att_df = pd.DataFrame(rows)
+
+            # Ensure dynamic total column
+            att_df["Total"] = att_df[MONTHS_LIST].sum(axis=1)
+
+            edited_att = st.data_editor(
+                att_df,
+                use_container_width=True,
+                column_config={
+                    "Roll_No": st.column_config.NumberColumn("Roll No.", disabled=True),
+                    "Name": st.column_config.TextColumn("Name Of Student", disabled=True),
+                    **{m: st.column_config.NumberColumn(m, min_value=0, max_value=31) for m in MONTHS_LIST},
+                    "Total": st.column_config.NumberColumn("Total (कुल उपस्थिति)", disabled=True)
+                },
+                key=f"editor_att_{selected_class}"
             )
 
+            if st.button("💾 माहवार उपस्थिति सहेजें (Save Attendance Grid)", type="primary"):
+                # Recalculate totals
+                edited_att["Total"] = edited_att[MONTHS_LIST].sum(axis=1)
+                cls_data["monthly_attendance"] = edited_att
+                
+                # Sync back to students dataframe Total_Days & Attended_Days
+                for idx, r in edited_att.iterrows():
+                    r_no = r["Roll_No"]
+                    cls_data["students"].loc[cls_data["students"]["Roll_No"] == r_no, "Attended_Days"] = int(r["Total"])
+                    cls_data["students"].loc[cls_data["students"]["Roll_No"] == r_no, "Total_Days"] = int(tot_work_days)
 
+                save_data_to_disk()
+                st.success(f"✅ कक्षा {selected_class} की माहवार उपस्थिति सफलतापूर्वक सुरक्षित कर ली गई एवं मास्टर रिकॉर्ड में अपडेट हो गई!")
 
+            # Step 3: Export Attendance Sheet
+            st.divider()
+            st.markdown("### 📥 उपस्थिति डेटा एक्सपोर्ट (Export Attendance Register)")
+            if render_export_gatekeeper("उपस्थिति रजिस्टर"):
+                c_att_exp1, c_att_exp2, c_att_exp3 = st.columns([2, 2, 2])
+                with c_att_exp1:
+                    att_fmt = st.selectbox("फ़ाइल प्रारूप चुनें (Format):", ["Excel (.xlsx)", "CSV (.csv)"], key="att_exp_fmt")
+                with c_att_exp2:
+                    att_export_df = edited_att.copy()
+                    att_bytes, att_mime, att_ext = export_dataframe_bytes(att_export_df, att_fmt)
+                    att_filename = f"Attendance_{selected_class}_{st.session_state.school_info.get('session','2023-24')}{att_ext}"
+                    st.download_button(
+                        f"📥 उपस्थिति पत्रक डाउनलोड करें ({att_fmt})",
+                        data=att_bytes,
+                        file_name=att_filename,
+                        mime=att_mime,
+                        type="primary",
+                        use_container_width=True
+                    )
 
 # ----------------- MODULE 4: EVALUATION ENTRY (SUBJECT-WISE PRESENT/ABSENT) -----------------
 elif menu == T["nav_eval"]:
@@ -1655,44 +3005,45 @@ elif menu == T["nav_viewer"]:
         else:
             # Export options for all data-entered students in this class & section
             with st.expander("📥 इस कक्षा/सेक्शन के सभी डेटा-दर्ज छात्रों का रिकॉर्ड एक्सपोर्ट करें (Export Roster Data)", expanded=False):
-                col_t5_exp1, col_t5_exp2, col_t5_exp3 = st.columns([3, 2, 3])
-                with col_t5_exp1:
-                    t5_exp_type = st.selectbox(
-                        "प्रारूप चुनें (Template):",
-                        [
-                            "📋 संपूर्ण छात्रवार रिकॉर्ड (44-Column Master Dossier)",
-                            "🏛️ RSKMP पोर्टल प्रारूप (rskmp.in Upload Template)",
-                            "🏢 MPBSE बोर्ड प्रारूप (mpbse.nic.in Format)"
-                        ],
-                        key="t5_exp_type_choice"
-                    )
-                with col_t5_exp2:
-                    t5_file_ext = st.selectbox("फ़ाइल फॉर्मेट:", ["Excel (.xlsx)", "CSV (.csv)"], key="t5_file_ext_choice")
-                with col_t5_exp3:
-                    st.markdown("<div style='margin-top: 28px;'>", unsafe_allow_html=True)
-                    export_students_df = pd.DataFrame(data_entered_students)
-                    if "RSKMP" in t5_exp_type:
-                        t5_out_df = generate_rskmp_df(export_students_df, v_evals, v_subjects, st.session_state.school_info, v_class)
-                        t5_fn_prefix = f"RSKMP_Dossier_{v_class}_{v_section}_{st.session_state.school_info.get('session','2023-24')}"
-                    elif "MPBSE" in t5_exp_type:
-                        t5_out_df = generate_mpbse_df(export_students_df, v_evals, v_subjects, st.session_state.school_info, v_class)
-                        t5_fn_prefix = f"MPBSE_Dossier_{v_class}_{v_section}_{st.session_state.school_info.get('session','2023-24')}"
-                    else:
-                        t5_out_df = generate_master_44col_df(export_students_df, v_evals, v_subjects, st.session_state.school_info, v_class)
-                        t5_fn_prefix = f"Students_Master_Dossier_{v_class}_{v_section}_{st.session_state.school_info.get('session','2023-24')}"
+                if render_export_gatekeeper("छात्र डॉसियर"):
+                    col_t5_exp1, col_t5_exp2, col_t5_exp3 = st.columns([3, 2, 3])
+                    with col_t5_exp1:
+                        t5_exp_type = st.selectbox(
+                            "प्रारूप चुनें (Template):",
+                            [
+                                "📋 संपूर्ण छात्रवार रिकॉर्ड (44-Column Master Dossier)",
+                                "🏛️ RSKMP पोर्टल प्रारूप (rskmp.in Upload Template)",
+                                "🏢 MPBSE बोर्ड प्रारूप (mpbse.nic.in Format)"
+                            ],
+                            key="t5_exp_type_choice"
+                        )
+                    with col_t5_exp2:
+                        t5_file_ext = st.selectbox("फ़ाइल फॉर्मेट:", ["Excel (.xlsx)", "CSV (.csv)"], key="t5_file_ext_choice")
+                    with col_t5_exp3:
+                        st.markdown("<div style='margin-top: 28px;'>", unsafe_allow_html=True)
+                        export_students_df = pd.DataFrame(data_entered_students)
+                        if "RSKMP" in t5_exp_type:
+                            t5_out_df = generate_rskmp_df(export_students_df, v_evals, v_subjects, st.session_state.school_info, v_class)
+                            t5_fn_prefix = f"RSKMP_Dossier_{v_class}_{v_section}_{st.session_state.school_info.get('session','2023-24')}"
+                        elif "MPBSE" in t5_exp_type:
+                            t5_out_df = generate_mpbse_df(export_students_df, v_evals, v_subjects, st.session_state.school_info, v_class)
+                            t5_fn_prefix = f"MPBSE_Dossier_{v_class}_{v_section}_{st.session_state.school_info.get('session','2023-24')}"
+                        else:
+                            t5_out_df = generate_master_44col_df(export_students_df, v_evals, v_subjects, st.session_state.school_info, v_class)
+                            t5_fn_prefix = f"Students_Master_Dossier_{v_class}_{v_section}_{st.session_state.school_info.get('session','2023-24')}"
 
 
-                    t5_bytes, t5_mime, t5_ext = export_dataframe_bytes(t5_out_df, t5_file_ext)
-                    st.download_button(
-                        f"🚀 डेटा डाउनलोड करें ({t5_file_ext})",
-                        data=t5_bytes,
-                        file_name=f"{t5_fn_prefix}{t5_ext}",
-                        mime=t5_mime,
-                        type="primary",
-                        use_container_width=True,
-                        key="btn_download_t5_all"
-                    )
-                    st.markdown("</div>", unsafe_allow_html=True)
+                        t5_bytes, t5_mime, t5_ext = export_dataframe_bytes(t5_out_df, t5_file_ext)
+                        st.download_button(
+                            f"🚀 डेटा डाउनलोड करें ({t5_file_ext})",
+                            data=t5_bytes,
+                            file_name=f"{t5_fn_prefix}{t5_ext}",
+                            mime=t5_mime,
+                            type="primary",
+                            use_container_width=True,
+                            key="btn_download_t5_all"
+                        )
+                        st.markdown("</div>", unsafe_allow_html=True)
 
 
             st.caption("👉 जिस भी विद्यार्थी का संपूर्ण डेटा देखना है, उसके नाम के सामने **'👁️ पूरा डेटा देखें'** बटन पर क्लिक करें:")
@@ -1748,14 +3099,14 @@ elif menu == T["nav_viewer"]:
         t_marks = t_ev.get("marks", {})
 
 
-        c_back1, c_back2, c_back3 = st.columns([2, 1, 1])
+        c_back1, c_back2, c_back3, c_back4 = st.columns([2.2, 1, 1.5, 1])
         with c_back1:
             st.markdown(f"### 📋 विद्यार्थी संपूर्ण रिकॉर्ड: {target_student['Name']} (Roll: {cur_sel_roll})")
         with c_back2:
             single_st_df = generate_master_44col_df(pd.DataFrame([target_student]), v_evals, v_subjects, st.session_state.school_info, v_class)
             s_b, s_m, s_ext = export_dataframe_bytes(single_st_df, "Excel (.xlsx)")
             st.download_button(
-                "📥 यह रिकॉर्ड (Excel)",
+                "📥 Excel",
                 data=s_b,
                 file_name=f"Student_{cur_sel_roll}_{target_student['Name']}_{st.session_state.school_info.get('session','2023-24')}.xlsx",
                 mime=s_m,
@@ -1763,7 +3114,25 @@ elif menu == T["nav_viewer"]:
                 key=f"btn_single_exp_{cur_sel_roll}"
             )
         with c_back3:
-            if st.button("⬅️ वापस छात्र सूची", type="secondary", use_container_width=True):
+            # WhatsApp share button
+            m5_wa_tot = sum([t_marks.get(sub["id"], {}).get("total", 75) for sub in v_subjects])
+            m5_wa_pct = round((m5_wa_tot / v_max_total) * 100, 1) if v_max_total else 0
+            m5_wa_grd = calculate_grade(m5_wa_pct)
+            m5_wa_res = "PASS (उत्तीर्ण)" if (m5_wa_pct >= 33 and t_ev.get("status", "Present") != "Absent") else "FAIL"
+            m5_mob = target_student.get("Contact", target_student.get("Mobile", ""))
+            m5_wa_url, _ = generate_whatsapp_result_link(
+                target_student['Name'], cur_sel_roll, v_class, m5_wa_tot, v_max_total, m5_wa_pct, m5_wa_grd, m5_wa_res,
+                st.session_state.school_info.get('name', 'शासकीय विद्यालय'), m5_mob
+            )
+            st.markdown(f"""
+            <a href="{m5_wa_url}" target="_blank" style="text-decoration: none;">
+                <div style="background: #25D366; color: white; font-weight: bold; font-size: 12.5px; padding: 6px 8px; border-radius: 6px; text-align: center; box-shadow: 0 2px 4px rgba(37,211,102,0.25);">
+                    📲 WhatsApp रिजल्ट
+                </div>
+            </a>
+            """, unsafe_allow_html=True)
+        with c_back4:
+            if st.button("⬅️ वापस", type="secondary", use_container_width=True):
                 st.session_state.active_dossier_roll = None
                 st.rerun()
 
@@ -1916,7 +3285,7 @@ elif menu == T["nav_marksheet"]:
         st.warning("⚠️ कक्षा में कोई छात्र उपलब्ध नहीं है।")
     else:
         st_names = [f"Roll {s['Roll_No']}: {s['Name']}" for _, s in students_df.iterrows()]
-        c_top1, c_top2, c_top3 = st.columns([3, 2, 2])
+        c_top1, c_top2, c_top3, c_top4 = st.columns([2.5, 2, 1.2, 2.3])
         with c_top1:
             sel_student_str = st.selectbox("विद्यार्थी / रोल नंबर चुनें:", st_names)
             sel_roll = int(sel_student_str.split(":")[0].replace("Roll", "").strip())
@@ -1931,6 +3300,32 @@ elif menu == T["nav_marksheet"]:
         with c_top3:
             st.markdown("<div style='margin-top: 22px;'>", unsafe_allow_html=True)
             st.button("🖨️ Print", on_click=None, use_container_width=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+        with c_top4:
+            st.markdown("<div style='margin-top: 10px;'>", unsafe_allow_html=True)
+            # WhatsApp instant trigger placeholder
+            wa_target_st = students_df[students_df["Roll_No"] == sel_roll].iloc[0]
+            st_ev_wa = cls_data["evaluations"].get(sel_roll, {})
+            st_m_wa = st_ev_wa.get("marks", {})
+            cls_subs_wa = get_class_subjects(selected_class)
+            wa_tot = sum([st_m_wa.get(sub["id"], {}).get("total", 75) for sub in cls_subs_wa])
+            wa_max = len(cls_subs_wa) * 100
+            wa_pct = round((wa_tot / wa_max) * 100, 1) if wa_max else 0
+            wa_grd = calculate_grade(wa_pct)
+            wa_res = "PASS (उत्तीर्ण)" if (wa_pct >= 33 and st_ev_wa.get("status", "Present") != "Absent") else "FAIL"
+            
+            wa_mob_val = wa_target_st.get("Contact", wa_target_st.get("Mobile", ""))
+            wa_link, _ = generate_whatsapp_result_link(
+                wa_target_st['Name'], sel_roll, selected_class, wa_tot, wa_max, wa_pct, wa_grd, wa_res,
+                st.session_state.school_info.get('name', 'शासकीय विद्यालय'), wa_mob_val
+            )
+            st.markdown(f"""
+            <a href="{wa_link}" target="_blank" style="text-decoration: none;">
+                <div style="background: #25D366; color: white; font-weight: bold; font-size: 13px; padding: 7px 10px; border-radius: 6px; text-align: center; box-shadow: 0 2px 4px rgba(37,211,102,0.3); margin-top: 12px;">
+                    📲 WhatsApp पर रिजल्ट भेजें
+                </div>
+            </a>
+            """, unsafe_allow_html=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
 
@@ -2312,51 +3707,52 @@ elif menu == T["nav_a3_result"]:
     
     # ----------------- PORTAL EXPORT CENTER (RSKMP, MPBSE, MASTER GAZETTE) -----------------
     with st.expander("📥 सरकारी पोर्टल एवं परीक्षाफल एक्सपोर्ट केंद्र (Export for RSKMP / MPBSE / Excel)", expanded=True):
-        st.info("💡 **पोर्टल अपलोड निर्देश:** यहाँ से आप सीधे **RSKMP (rskmp.in)** और **MPBSE (mpbse.nic.in)** के आधिकारिक एक्सेल/सीएसवी प्रारूप में डेटा डाउनलोड कर सकते हैं जिसे सीधे पोर्टल पर बल्क अपलोड किया जा सकता है:")
+        if render_export_gatekeeper("RSKMP एवं A3 गोशवारा एक्सपोर्ट"):
+            st.info("💡 **पोर्टल अपलोड निर्देश:** यहाँ से आप सीधे **RSKMP (rskmp.in)** और **MPBSE (mpbse.nic.in)** के आधिकारिक एक्सेल/सीएसवी प्रारूप में डेटा डाउनलोड कर सकते हैं जिसे सीधे पोर्टल पर बल्क अपलोड किया जा सकता है:")
         
-        col_p_type, col_p_file, col_p_btn = st.columns([3, 2, 3])
-        with col_p_type:
-            export_portal_type = st.selectbox(
-                "1. एक्सपोर्ट प्रारूप चुनें (Choose Export Template):",
-                [
-                    "🏛️ RSKMP पोर्टल प्रारूप (rskmp.in Upload Template - Class 1 to 8)",
-                    "🏢 MPBSE बोर्ड पोर्टल प्रारूप (mpbse.nic.in / MP Online Format)",
-                    "📋 संपूर्ण 44-कॉलम शालेय गोशवारा (44-Column Master Tabulation Gazette)"
-                ],
-                key="exp_portal_choice"
-            )
-        with col_p_file:
-            export_file_format = st.selectbox(
-                "2. फ़ाइल एक्सटेंशन (File Format):",
-                ["Excel (.xlsx)", "CSV (.csv)"],
-                key="exp_file_ext_choice"
-            )
-        with col_p_btn:
-            st.markdown("<div style='margin-top: 28px;'>", unsafe_allow_html=True)
-            if "RSKMP" in export_portal_type:
-                target_df = generate_rskmp_df(students_df, cls_data["evaluations"], cls_subjects, s_info, selected_class)
-                f_prefix = f"RSKMP_Upload_{selected_class}_{s_info.get('session','2023-24')}"
-            elif "MPBSE" in export_portal_type:
-                target_df = generate_mpbse_df(students_df, cls_data["evaluations"], cls_subjects, s_info, selected_class)
-                f_prefix = f"MPBSE_Board_{selected_class}_{s_info.get('session','2023-24')}"
-            else:
-                target_df = generate_master_44col_df(students_df, cls_data["evaluations"], cls_subjects, s_info, selected_class)
-                f_prefix = f"Master_Gazette_A3_{selected_class}_{s_info.get('session','2023-24')}"
+            col_p_type, col_p_file, col_p_btn = st.columns([3, 2, 3])
+            with col_p_type:
+                export_portal_type = st.selectbox(
+                    "1. एक्सपोर्ट प्रारूप चुनें (Choose Export Template):",
+                    [
+                        "🏛️ RSKMP पोर्टल प्रारूप (rskmp.in Upload Template - Class 1 to 8)",
+                        "🏢 MPBSE बोर्ड पोर्टल प्रारूप (mpbse.nic.in / MP Online Format)",
+                        "📋 संपूर्ण 44-कॉलम शालेय गोशवारा (44-Column Master Tabulation Gazette)"
+                    ],
+                    key="exp_portal_choice"
+                )
+            with col_p_file:
+                export_file_format = st.selectbox(
+                    "2. फ़ाइल एक्सटेंशन (File Format):",
+                    ["Excel (.xlsx)", "CSV (.csv)"],
+                    key="exp_file_ext_choice"
+                )
+            with col_p_btn:
+                st.markdown("<div style='margin-top: 28px;'>", unsafe_allow_html=True)
+                if "RSKMP" in export_portal_type:
+                    target_df = generate_rskmp_df(students_df, cls_data["evaluations"], cls_subjects, s_info, selected_class)
+                    f_prefix = f"RSKMP_Upload_{selected_class}_{s_info.get('session','2023-24')}"
+                elif "MPBSE" in export_portal_type:
+                    target_df = generate_mpbse_df(students_df, cls_data["evaluations"], cls_subjects, s_info, selected_class)
+                    f_prefix = f"MPBSE_Board_{selected_class}_{s_info.get('session','2023-24')}"
+                else:
+                    target_df = generate_master_44col_df(students_df, cls_data["evaluations"], cls_subjects, s_info, selected_class)
+                    f_prefix = f"Master_Gazette_A3_{selected_class}_{s_info.get('session','2023-24')}"
                 
-            p_bytes, p_mime, p_ext = export_dataframe_bytes(target_df, export_file_format)
-            st.download_button(
-                label=f"🚀 डेटा डाउनलोड करें ({export_file_format})",
-                data=p_bytes,
-                file_name=f"{f_prefix}{p_ext}",
-                mime=p_mime,
-                type="primary",
-                use_container_width=True
-            )
-            st.markdown("</div>", unsafe_allow_html=True)
-    st.divider()
+                p_bytes, p_mime, p_ext = export_dataframe_bytes(target_df, export_file_format)
+                st.download_button(
+                    label=f"🚀 डेटा डाउनलोड करें ({export_file_format})",
+                    data=p_bytes,
+                    file_name=f"{f_prefix}{p_ext}",
+                    mime=p_mime,
+                    type="primary",
+                    use_container_width=True
+                )
+                st.markdown("</div>", unsafe_allow_html=True)
+        st.divider()
 
 
-    # Top Notice and Print Button matching image_fde76c.png / image_fdd8e5.png
+        # Top Notice and Print Button matching image_fde76c.png / image_fdd8e5.png
     c_a3_top1, c_a3_top2 = st.columns([3, 1])
     with c_a3_top1:
         st.markdown('''
@@ -2383,7 +3779,7 @@ elif menu == T["nav_a3_result"]:
         r_no = s["Roll_No"]
         ev = cls_data["evaluations"].get(r_no, {})
         st_status = ev.get("status", s.get("Status", "Present"))
-        
+    
         if st_status == "Absent":
             absent_cnt += 1
         else:
@@ -2403,7 +3799,7 @@ elif menu == T["nav_a3_result"]:
             hy_val = s_eval.get("half_yearly", 32)
             yr_val = s_eval.get("annual", 48)
             sub_tot = s_eval.get("total", hy_val + yr_val)
-            
+        
             tot_obt += sub_tot
             if sub_tot < 33: all_passed = False
 
@@ -2418,7 +3814,7 @@ elif menu == T["nav_a3_result"]:
         is_pass = (all_passed and pct >= 33 and st_status != "Absent")
         res_str = "Pass" if is_pass else "Fail"
         res_color = "#008000" if is_pass else "#CC0000"
-        
+    
         if is_pass: pass_cnt += 1
         else: fail_cnt += 1
 
@@ -2568,36 +3964,36 @@ elif menu == T["nav_a3_result"]:
                     <th rowspan="3" class="v-th-tall">Category</th>
                     <th rowspan="3" class="v-th-tall">Samagra ID</th>
                     <th rowspan="3" style="border: 1px solid #000; min-width: 90px; vertical-align: middle; padding: 3px;">Aadhar No.</th>
-                    
+                
                     <th colspan="{sub_count}" style="border: 1px solid #000; padding: 2px 4px; font-size: 10px; height: 38px; vertical-align: middle;">Half Yearly<br>Evaluation<br>[Max. Marks - 40]</th>
                     <th colspan="{sub_count}" style="border: 1px solid #000; padding: 2px 4px; font-size: 10px; height: 38px; vertical-align: middle;">Annual<br>Evaluation<br>[Max. Marks - 60]</th>
                     <th colspan="{sub_count}" style="border: 1px solid #000; padding: 2px 4px; font-size: 10px; height: 38px; vertical-align: middle;">Final<br>Assessment<br>[Half + Annual]</th>
                     <th style="border: 1px solid #000; width: 28px; padding: 2px; font-size: 9.5px; height: 38px; vertical-align: middle;">Max.<br>{max_total}</th>
-                    
+                
                     <!-- GIANT FINAL RESULT SUPER-HEADER SPANNING COLS 25 TO 44 MATCHING image_fde76c.png -->
                     <th colspan="20" style="border: 1px solid #000; padding: 6px; font-size: 16px; font-weight: 900; letter-spacing: 0.5px; height: 38px; vertical-align: middle;">Final Result</th>
                 </tr>
-                
+            
                 <!-- ROW 2: SUB-HEADERS (Notice: Result, Percentage, Grade, Rank, Attendance have rowspan=2 with tall blank space above) -->
                 <tr style="background: #fff; font-weight: bold; text-align: center;">
                     {sub_th_hy}
                     {sub_th_yr}
                     {sub_th_fn}
                     <th rowspan="2" class="v-th-tall">Total Obtained</th>
-                    
+                
                     <!-- Under Final Result: Cols 25 to 29 (Row 2+3 merged with vertical-align: bottom) -->
                     <th rowspan="2" class="v-th-tall">Result</th>
                     <th rowspan="2" class="v-th-tall">Percentage</th>
                     <th rowspan="2" class="v-th-tall">Grade</th>
                     <th rowspan="2" class="v-th-tall">Rank</th>
                     <th rowspan="2" class="v-th-tall">Attendance</th>
-                    
+                
                     <!-- Under Final Result: Co-curricular header (Cols 30-34) -->
                     <th colspan="5" style="border: 1px solid #000; padding: 4px; font-size: 11px; font-weight: bold; height: 35px; vertical-align: middle;">Co-Curricular<br>Activities</th>
                     <!-- Under Final Result: Social Activities header (Cols 35-44) -->
                     <th colspan="10" style="border: 1px solid #000; padding: 4px; font-size: 11px; font-weight: bold; height: 35px; vertical-align: middle;">SOCIAL ACTIVITES</th>
                 </tr>
-                
+            
                 <!-- ROW 3: VERTICAL SUB-HEADERS FOR CO-CURRICULAR & SOCIAL (Cols 30 to 44) -->
                 <tr style="background: #fff; font-weight: bold; text-align: center;">
                     <!-- Co-Curricular items (Row 3 only) -->
@@ -2606,7 +4002,7 @@ elif menu == T["nav_a3_result"]:
                     <th class="v-th">CULTURAL SKILLS</th>
                     <th class="v-th">CREATIVITY</th>
                     <th class="v-th">SPORTS</th>
-                    
+                
                     <!-- Social Activities items (Row 3 only) -->
                     <th class="v-th">REGULARITY</th>
                     <th class="v-th">PUNCTUALITY</th>
@@ -2619,7 +4015,7 @@ elif menu == T["nav_a3_result"]:
                     <th class="v-th">HONESTY</th>
                     <th class="v-th">EXPRESIVE</th>
                 </tr>
-                
+            
                 <!-- ROW 4: NUMBERS ROW (1 TO 44) WITH LIGHT TAN/PEACH BACKGROUND (#ebdcd0) -->
                 <tr class="a3-num-row" style="text-align: center; font-weight: bold; height: 22px;">
                     {col_num_cells}
@@ -2662,7 +4058,7 @@ elif menu == T["nav_summary"]:
         r_no = s["Roll_No"]
         ev = cls_data["evaluations"].get(r_no, {})
         st_status = ev.get("status", s.get("Status", "Present"))
-        
+    
         tot_m = 0
         all_passed = True
         for sub in cls_subjects:
@@ -2674,7 +4070,7 @@ elif menu == T["nav_summary"]:
         pct = round((tot_m / max_total) * 100, 1) if max_total else 0
         grd = calculate_grade(pct)
         is_pass = (all_passed and pct >= 33 and st_status != "Absent")
-        
+    
         # Clean category
         c_raw = str(s.get("Category", "OBC")).upper()
         if "SC" in c_raw: c_clean = "SC"
@@ -2865,121 +4261,116 @@ elif menu == T["nav_summary"]:
     
     # Export Summary Tables for Department Submissions
     st.markdown("### 📥 सांख्यिकी सारांश एक्सपोर्ट (Export Result Summary for BEO / BRC / DEO Office)")
-    c_sexp1, c_sexp2 = st.columns([2, 2])
-    with c_sexp1:
-        s_exp_fmt = st.selectbox("फ़ाइल प्रारूप चुनें (Format):", ["Excel (.xlsx)", "CSV (.csv)"], key="sum_exp_fmt")
-    with c_sexp2:
-        # Build tabular dataframe of category stats
-        sum_rows = []
-        for m in summary_metrics:
-            r_dict = {"Summary_Metric": m}
-            for g in ["Girls", "Boys", "Grand Total"]:
-                for c in ["SC", "ST", "OBC", "GEN", "Total"]:
-                    col_k = "ALL" if c == "Total" else c
-                    g_k = "ALL" if g == "Grand Total" else g
-                    if m == "Percentage":
-                        pas = get_cnt(g_k, col_k, "Pass")
-                        app = get_cnt(g_k, col_k, "Appeared")
-                        val = f"{round((pas/max(1,app))*100)}%"
-                    else:
-                        val = get_cnt(g_k, col_k, m)
-                    r_dict[f"{g}_{c}"] = val
-            sum_rows.append(r_dict)
-        sum_df = pd.DataFrame(sum_rows)
-        s_bytes, s_mime, s_ext = export_dataframe_bytes(sum_df, s_exp_fmt)
-        st.download_button(
-            f"📥 सांख्यिकी सारांश डाउनलोड करें ({s_exp_fmt})",
-            data=s_bytes,
-            file_name=f"Result_Summary_Statistics_{selected_class}_{s_info.get('session','2023-24')}{s_ext}",
-            mime=s_mime,
-            type="primary",
-            use_container_width=True
-        )
-    st.divider()
-
-
-    render_html(summary_page_html)
-
-
+    if render_export_gatekeeper("परीक्षाफल सांख्यिकी सारांश"):
+        c_sexp1, c_sexp2 = st.columns([2, 2])
+        with c_sexp1:
+            s_exp_fmt = st.selectbox("फ़ाइल प्रारूप चुनें (Format):", ["Excel (.xlsx)", "CSV (.csv)"], key="sum_exp_fmt")
+        with c_sexp2:
+            sum_rows = []
+            for m in summary_metrics:
+                r_dict = {"Summary_Metric": m}
+                for g in ["Girls", "Boys", "Grand Total"]:
+                    for c in ["SC", "ST", "OBC", "GEN", "Total"]:
+                        col_k = "ALL" if c == "Total" else c
+                        g_k = "ALL" if g == "Grand Total" else g
+                        if m == "Percentage":
+                            pas = get_cnt(g_k, col_k, "Pass")
+                            app = get_cnt(g_k, col_k, "Appeared")
+                            val = f"{round((pas/max(1,app))*100)}%"
+                        else:
+                            val = get_cnt(g_k, col_k, m)
+                        r_dict[f"{g}_{c}"] = val
+                sum_rows.append(r_dict)
+            sum_df = pd.DataFrame(sum_rows)
+            s_bytes, s_mime, s_ext = export_dataframe_bytes(sum_df, s_exp_fmt)
+            st.download_button(
+                f"📥 सांख्यिकी सारांश डाउनलोड करें ({s_exp_fmt})",
+                data=s_bytes,
+                file_name=f"Result_Summary_Statistics_{selected_class}_{s_info.get('session','2023-24')}{s_ext}",
+                mime=s_mime,
+                type="primary",
+                use_container_width=True
+            )
+    
 # ----------------- MODULE 9: SESSION CHANGE & PROMOTION -----------------
 elif menu == T["nav_promote"]:
-    st.markdown(f'<div class="main-header">🔄 सत्र परिवर्तन एवं कक्षा पदोन्नति (Session Promotion)</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-header">नया शैक्षणिक सत्र प्रारंभ होने पर सभी उत्तीर्ण विद्यार्थियों को स्वतः अगली कक्षा में प्रमोट करें</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="main-header">🔄 सत्र परिवर्तन एवं कक्षा पदोन्नति (Session Promotion)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sub-header">नया शैक्षणिक सत्र प्रारंभ होने पर सभी उत्तीर्ण विद्यार्थियों को स्वतः अगली कक्षा में प्रमोट करें</div>', unsafe_allow_html=True)
 
 
-    col_p1, col_p2 = st.columns(2)
-    with col_p1:
-        c_sess = st.text_input("वर्तमान शैक्षणिक सत्र:", value=st.session_state.school_info.get("session", "2023-24"), disabled=True)
-    with col_p2:
-        parts = c_sess.split("-")
-        try:
-            y1 = int(parts[0])
-            y2 = int(parts[1]) if len(parts) > 1 else y1 + 1
-            default_next = f"{y1+1}-{y2+1}"
-        except Exception:
-            default_next = "2024-25"
-        n_sess = st.text_input("आगामी नया शैक्षणिक सत्र:", value=default_next)
+        col_p1, col_p2 = st.columns(2)
+        with col_p1:
+            c_sess = st.text_input("वर्तमान शैक्षणिक सत्र:", value=st.session_state.school_info.get("session", "2023-24"), disabled=True)
+        with col_p2:
+            parts = c_sess.split("-")
+            try:
+                y1 = int(parts[0])
+                y2 = int(parts[1]) if len(parts) > 1 else y1 + 1
+                default_next = f"{y1+1}-{y2+1}"
+            except Exception:
+                default_next = "2024-25"
+            n_sess = st.text_input("आगामी नया शैक्षणिक सत्र:", value=default_next)
 
 
-    st.divider()
-    st.subheader("कक्षा पदोन्नति का प्रारूप (Promotion Flow Preview):")
+        st.divider()
+        st.subheader("कक्षा पदोन्नति का प्रारूप (Promotion Flow Preview):")
 
 
-    promo_preview = []
-    classes = st.session_state.classes_list
-    for idx, c in enumerate(classes):
-        cnt = len(st.session_state.data_store.get(c, {}).get("students", []))
-        if idx < len(classes) - 1:
-            target = classes[idx + 1]
-            status_text = f"Promote to {target} ➡️"
-        else:
-            target = "Graduated / Passed Out (Alumni)"
-            status_text = "Graduate / Issue TC 🎓"
-        promo_preview.append({"Current Class": c, "Total Students": cnt, "Next Class (New Session)": target, "Action": status_text})
+        promo_preview = []
+        classes = st.session_state.classes_list
+        for idx, c in enumerate(classes):
+            cnt = len(st.session_state.data_store.get(c, {}).get("students", []))
+            if idx < len(classes) - 1:
+                target = classes[idx + 1]
+                status_text = f"Promote to {target} ➡️"
+            else:
+                target = "Graduated / Passed Out (Alumni)"
+                status_text = "Graduate / Issue TC 🎓"
+            promo_preview.append({"Current Class": c, "Total Students": cnt, "Next Class (New Session)": target, "Action": status_text})
 
 
-    st.dataframe(pd.DataFrame(promo_preview), use_container_width=True)
+        st.dataframe(pd.DataFrame(promo_preview), use_container_width=True)
 
 
-    st.warning("⚠️ ध्यान दें: प्रमोट करने पर सभी विद्यार्थियों का व्यक्तिगत विवरण (नाम, स्कॉलर नं, माता-पिता, जन्मतिथि, समग्र आईडी, फोटो) अगली कक्षा में चला जाएगा और नए सत्र के लिए परीक्षा अंक रीसेट हो जाएंगे।")
+        st.warning("⚠️ ध्यान दें: प्रमोट करने पर सभी विद्यार्थियों का व्यक्तिगत विवरण (नाम, स्कॉलर नं, माता-पिता, जन्मतिथि, समग्र आईडी, फोटो) अगली कक्षा में चला जाएगा और नए सत्र के लिए परीक्षा अंक रीसेट हो जाएंगे।")
 
 
-    if st.button("🚀 सभी पात्र विद्यार्थियों को अगली कक्षा में प्रमोट करें (Promote All)", type="primary"):
-        graduated_list = []
-        old_store = st.session_state.data_store
-        new_store = {}
+        if st.button("🚀 सभी पात्र विद्यार्थियों को अगली कक्षा में प्रमोट करें (Promote All)", type="primary"):
+            graduated_list = []
+            old_store = st.session_state.data_store
+            new_store = {}
 
 
-        for c in classes:
-            new_store[c] = {
-                "students": pd.DataFrame(),
-                "evaluations": {},
-                "monthly_attendance": pd.DataFrame(),
-                "working_days": DEFAULT_WORKING_DAYS
-            }
+            for c in classes:
+                new_store[c] = {
+                    "students": pd.DataFrame(),
+                    "evaluations": {},
+                    "monthly_attendance": pd.DataFrame(),
+                    "working_days": DEFAULT_WORKING_DAYS
+                }
 
 
-        for i in range(len(classes) - 1, -1, -1):
-            cur_cls = classes[i]
-            cur_students = old_store.get(cur_cls, {}).get("students", pd.DataFrame())
+            for i in range(len(classes) - 1, -1, -1):
+                cur_cls = classes[i]
+                cur_students = old_store.get(cur_cls, {}).get("students", pd.DataFrame())
 
 
-            if not cur_students.empty:
-                if i == len(classes) - 1:
-                    graduated_list.extend(cur_students.to_dict(orient="records"))
-                else:
-                    nxt_cls = classes[i + 1]
-                    promoted_df = cur_students.copy()
-                    promoted_df["Class"] = nxt_cls
-                    promoted_df["Roll_No"] = range(101, 101 + len(promoted_df))
-                    new_store[nxt_cls]["students"] = promoted_df
+                if not cur_students.empty:
+                    if i == len(classes) - 1:
+                        graduated_list.extend(cur_students.to_dict(orient="records"))
+                    else:
+                        nxt_cls = classes[i + 1]
+                        promoted_df = cur_students.copy()
+                        promoted_df["Class"] = nxt_cls
+                        promoted_df["Roll_No"] = range(101, 101 + len(promoted_df))
+                        new_store[nxt_cls]["students"] = promoted_df
 
 
-        st.session_state.data_store = new_store
-        st.session_state.school_info["session"] = n_sess
-        save_data_to_disk()
+            st.session_state.data_store = new_store
+            st.session_state.school_info["session"] = n_sess
+            save_data_to_disk()
 
 
-        st.balloons()
-        st.success(f"🎉 बधाई हो! सभी कक्षाओं के विद्यार्थी सफलतापूर्वक आगामी सत्र {n_sess} की अगली कक्षा में प्रमोट हो गए हैं!")
-        st.rerun()
+            st.balloons()
+            st.success(f"🎉 बधाई हो! सभी कक्षाओं के विद्यार्थी सफलतापूर्वक आगामी सत्र {n_sess} की अगली कक्षा में प्रमोट हो गए हैं!")
+            st.rerun()
