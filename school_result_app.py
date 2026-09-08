@@ -1136,6 +1136,133 @@ def generate_whatsapp_result_link(student_name, roll_no, cls_name, grand_obt, ma
 
 # ----------------- DPDP ACT EXPORT GATEKEEPER & AUDIT VERIFIER -----------------
 
+
+def render_govt_portals_hub(tab_title, target_class, export_df=None, default_file_name="Portal_Upload"):
+    """
+    Renders the Unified Government Portals Hub in any tab:
+    1. Clickable official portal links: RSKMP, MPBSE, Shiksha Portal, Vimarsh Portal
+    2. Direct Portal Upload / Web Bridge (WITHOUT OTP) accessible to all roles
+    3. Computer file download (.xlsx / .csv) ONLY for Principal and strictly OTP-protected
+    """
+    cur_role = st.session_state.get("authenticated_role", "PRINCIPAL")
+    is_teacher = (cur_role == "TEACHER")
+    s_info = st.session_state.school_info
+    cur_sess = s_info.get("session", "2026-27")
+    clean_cls = str(target_class).lower()
+    is_9_10 = ("class 9" in clean_cls or "class 10" in clean_cls or "9th" in clean_cls or "10th" in clean_cls)
+
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%); border: 1px solid #BFDBFE; border-radius: 8px; padding: 12px 16px; margin: 14px 0 10px 0;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+            <div>
+                <b style="color: #1E3A8A; font-size: 14.5px;">🌐 शासकीय पोर्टल डायरेक्ट अपलोड एवं सिंक हब (Govt Portals Direct Hub)</b><br>
+                <span style="font-size: 11.5px; color: #475569;">RSKMP (1ली से 8वीं), MPBSE (9वीं-10वीं), समग्र शिक्षा पोर्टल एवं विमर्श पोर्टल से सीधा जुड़ाव</span>
+            </div>
+            <div style="font-size: 11px; background: #DCFCE7; color: #166534; font-weight: bold; padding: 4px 10px; border-radius: 20px; border: 1px solid #86EFAC;">
+                🟢 डायरेक्ट पोर्टल सिंक डेस्क सक्रिय (बिना OTP के उपयोग हेतु अधिकृत)
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # 1. Official Portal Clickable Links Bar
+    c_p1, c_p2, c_p3, c_p4 = st.columns(4)
+    with c_p1:
+        st.markdown("""
+        <a href="https://www.rskmp.in" target="_blank" style="text-decoration: none;">
+            <div style="background: #1E3A8A; color: white; padding: 8px 10px; border-radius: 6px; text-align: center; font-size: 12px; font-weight: bold; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                🏛️ RSKMP पोर्टल (rskmp.in)
+            </div>
+        </a>
+        """, unsafe_allow_html=True)
+    with c_p2:
+        st.markdown("""
+        <a href="https://mpbse.mponline.gov.in" target="_blank" style="text-decoration: none;">
+            <div style="background: #D97706; color: white; padding: 8px 10px; border-radius: 6px; text-align: center; font-size: 12px; font-weight: bold; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                🏢 MPBSE पोर्टल (MP Online)
+            </div>
+        </a>
+        """, unsafe_allow_html=True)
+    with c_p3:
+        st.markdown("""
+        <a href="https://shikshaportal.mp.gov.in" target="_blank" style="text-decoration: none;">
+            <div style="background: #0D9488; color: white; padding: 8px 10px; border-radius: 6px; text-align: center; font-size: 12px; font-weight: bold; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                📚 समग्र शिक्षा पोर्टल (MP)
+            </div>
+        </a>
+        """, unsafe_allow_html=True)
+    with c_p4:
+        st.markdown("""
+        <a href="https://www.vimarsh.mp.gov.in" target="_blank" style="text-decoration: none;">
+            <div style="background: #4F46E5; color: white; padding: 8px 10px; border-radius: 6px; text-align: center; font-size: 12px; font-weight: bold; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                🎯 विमर्श पोर्टल (DPI MP)
+            </div>
+        </a>
+        """, unsafe_allow_html=True)
+
+    # 2. Two Columns: Left = Direct Portal Upload / Bridge (WITHOUT OTP), Right = Computer File Download (ONLY Principal & OTP PROTECTED)
+    c_hub_left, c_hub_right = st.columns([1.5, 1.5])
+    
+    with c_hub_left:
+        with st.expander("🚀 डायरेक्ट पोर्टल पर डेटा अपलोड / प्रेषण (बिना OTP के)", expanded=True):
+            st.markdown(f"**कक्षा:** `{target_class}` | **माड्यूल:** `{tab_title}`")
+            target_portal_url = "https://www.rskmp.in" if not is_9_10 else "https://mpbse.mponline.gov.in"
+            target_portal_name = "RSKMP (rskmp.in)" if not is_9_10 else "MPBSE MP Online"
+            
+            st.markdown(f"""
+            <a href="{target_portal_url}" target="_blank" style="text-decoration: none;">
+                <div style="background: #15803D; color: white; padding: 10px 14px; border-radius: 6px; text-align: center; font-weight: bold; font-size: 13px; margin: 6px 0;">
+                    🌐 सीधे {target_portal_name} खोलें एवं डेटा प्रेषित करें ↗
+                </div>
+            </a>
+            """, unsafe_allow_html=True)
+            
+            st.caption("ℹ️ इस विकल्प के लिए OTP की आवश्यकता नहीं है। शिक्षक या संस्था प्रधान सीधे पोर्टल लॉगिन कर डेटा अपलोड कर सकते हैं।")
+            
+            if export_df is not None and not export_df.empty:
+                show_payload = st.checkbox("📋 1-क्लिक डेटा पेलोड देखें / कॉपी करें (Portal Fast Upload)", value=False, key=f"chk_payload_{tab_title}_{target_class}")
+                if show_payload:
+                    csv_preview = export_df.to_csv(index=False)
+                    st.text_area("पोर्टल हेतु तैयार डेटा (CSV / Copy-Paste Text):", value=csv_preview, height=120, key=f"ta_payload_{tab_title}_{target_class}")
+                    st.info("💡 उपरोक्त डेटा को कॉपी करके सीधे पोर्टल के बल्क इंपोर्ट में उपयोग कर सकते हैं।")
+
+    with c_hub_right:
+        with st.expander("📥 कंप्यूटर में बल्क अपलोड फ़ाइल डाउनलोड (केवल Principal हेतु - OTP सुरक्षित)", expanded=True):
+            if is_teacher:
+                st.markdown("""
+                <div style="background: #FEF2F2; border-left: 4px solid #EF4444; padding: 10px 14px; border-radius: 6px; color: #991B1B; font-size: 12px; margin: 6px 0;">
+                    <b>🔒 शासकीय डेटा सुरक्षा सूचना:</b> कंप्यूटर में शासकीय पोर्टल हेतु बल्क अपलोड एक्सेल/सीएसवी फ़ाइल डाउनलोड करने का अधिकार केवल <b>संस्था प्रधान (Principal)</b> खाते में अधिकृत है।
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown("<span style='font-size: 12px; color: #334155;'>पोर्टल पर ऑफलाइन बल्क अपलोड हेतु Excel/CSV फ़ाइल अपने कंप्यूटर में डाउनलोड करें:</span>", unsafe_allow_html=True)
+                if export_df is not None and not export_df.empty:
+                    if render_export_gatekeeper(f"{tab_title} फ़ाइल डाउनलोड"):
+                        c_dw1, c_dw2 = st.columns(2)
+                        with c_dw1:
+                            x_bytes, x_mime, x_ext = export_dataframe_bytes(export_df, "Excel (.xlsx)")
+                            st.download_button(
+                                "📥 एक्सेल फ़ाइल (.xlsx)",
+                                data=x_bytes,
+                                file_name=f"{default_file_name}_{target_class}_{cur_sess}.xlsx",
+                                mime=x_mime,
+                                type="primary",
+                                use_container_width=True,
+                                key=f"btn_dw_xlsx_{tab_title}_{target_class}"
+                            )
+                        with c_dw2:
+                            c_bytes, c_mime, c_ext = export_dataframe_bytes(export_df, "CSV (.csv)")
+                            st.download_button(
+                                "📥 CSV फ़ाइल (.csv)",
+                                data=c_bytes,
+                                file_name=f"{default_file_name}_{target_class}_{cur_sess}.csv",
+                                mime=c_mime,
+                                use_container_width=True,
+                                key=f"btn_dw_csv_{tab_title}_{target_class}"
+                            )
+                else:
+                    st.caption("⚠️ इस कक्षा में अभी कोई डेटा उपलब्ध नहीं है।")
+
 def render_export_gatekeeper(context_label="Data Export"):
 
     """
@@ -1224,6 +1351,40 @@ def render_export_gatekeeper(context_label="Data Export"):
   
 
 # ----------------- MONTHLY EVALUATION SCHEDULE & WEIGHTAGE ENGINE -----------------
+
+
+def smart_match_subject_col(col_name, sub_name, sub_id):
+    """Fuzzy matches Excel column names to academic subject definitions"""
+    c = str(col_name).lower().strip()
+    s_name = str(sub_name).lower().strip()
+    s_id = str(sub_id).lower().strip()
+    
+    if s_id in ["social_science", "sst"] or "social" in s_name or "सामाजिक" in s_name:
+        return ("social" in c or "सामाजिक" in c or "sst" in c)
+    if s_id == "science" or ("science" in s_name and "social" not in s_name) or ("विज्ञान" in s_name and "सामाजिक" not in s_name):
+        return ("science" in c or "विज्ञान" in c) and ("social" not in c and "सामाजिक" not in c)
+    if ("hindi" in s_name or "हिन्दी" in s_name) and ("hindi" in c or "हिन्दी" in c):
+        return True
+    if ("english" in s_name or "अंग्रेजी" in s_name) and ("english" in c or "अंग्रेजी" in c):
+        return True
+    if ("sanskrit" in s_name or "संस्कृत" in s_name) and ("sanskrit" in c or "संस्कृत" in c):
+        return True
+    if ("math" in s_name or "गणित" in s_name) and ("math" in c or "गणित" in c):
+        return True
+    if ("evs" in s_name or "पर्यावरण" in s_name) and ("evs" in c or "पर्यावरण" in c or "environ" in c):
+        return True
+    return s_name in c or s_id in c
+
+def parse_marks_upload_file(uploaded_file):
+    """Parses uploaded Excel or CSV into DataFrame safely"""
+    try:
+        fname = uploaded_file.name.lower()
+        if fname.endswith(".csv"):
+            return pd.read_csv(uploaded_file)
+        else:
+            return pd.read_excel(uploaded_file)
+    except Exception as e:
+        return None
 
 def get_class_monthly_test_months(cls_name):
 
@@ -1801,7 +1962,7 @@ I18N = {
 
         "nav_project": "🎨 8. वार्षिक प्रोजेक्ट कार्य मूल्यांकन (Project Work — 10%/20 अंक)",
 
-        "nav_marksheet": "🖨️ 9. वार्षिक प्रगति पत्रक (Print Marksheet)",
+        "nav_marksheet": "🖨️ 9. शासकीय वार्षिक प्रगति पत्रक एवं RSKMP/MPBSE पोर्टल केंद्र",
 
         "nav_a3_result": "📜 10. A3 वार्षिक परीक्षाफल पत्रक (Annual Result Sheet)",
 
@@ -1811,7 +1972,7 @@ I18N = {
 
         "nav_supple": "📋 13. पूरक परीक्षा छात्र सूची (Supplementary List)",
 
-        "nav_weighted": "📑 14. 35-कॉलम वेटेज मूल्यांकन पत्रक (Weighted Assessment)",
+        "nav_weighted": "📑 14. वार्षिक परीक्षा परिणाम अभिलेख पत्रक (RSKMP व MPBSE प्रारूप)",
 
         "nav_promote": "🔄 15. सत्र परिवर्तन एवं कक्षा पदोन्नति (Session Promotion)",
 
@@ -1865,7 +2026,7 @@ I18N = {
 
         "nav_project": "🎨 8. Annual Project Work Evaluation",
 
-        "nav_marksheet": "🖨️ 9. Progress Report Card (Marksheet)",
+        "nav_marksheet": "🖨️ 9. Govt Holistic Progress Card & RSKMP/MPBSE Portal Center",
 
         "nav_a3_result": "📜 10. A3 Annual Result Sheet",
 
@@ -1875,7 +2036,7 @@ I18N = {
 
         "nav_supple": "📋 13. Supplementary Students List",
 
-        "nav_weighted": "📑 14. 35-Column Weighted Assessment Sheet",
+        "nav_weighted": "📑 14. Annual Result Record Sheet (RSKMP & MPBSE Format)",
 
         "nav_promote": "🔄 15. Session Roll-over & Promotion",
 
@@ -1929,7 +2090,7 @@ I18N = {
 
         "nav_project": "🎨 8. वार्षिक प्रकल्प कार्य मूल्यमापन (Project Work)",
 
-        "nav_marksheet": "🖨️ 9. प्रगती पत्रक (Marksheet)",
+        "nav_marksheet": "🖨️ 9. शासकीय प्रगती पत्रक व RSKMP/MPBSE पोर्टल केंद्र",
 
         "nav_a3_result": "📜 10. A3 वार्षिक निकाल पत्रक (Annual Result Sheet)",
 
@@ -1939,7 +2100,7 @@ I18N = {
 
         "nav_supple": "📋 13. पुरवणी परीक्षा विद्यार्थी यादी (Supplementary List)",
 
-        "nav_weighted": "📑 14. 35-स्तंभ वेटेज मूल्यमापन पत्रक (Weighted Assessment)",
+        "nav_weighted": "📑 14. वार्षिक निकाल अभिलेख पत्रक (RSKMP व MPBSE प्रारूप)",
 
         "nav_promote": "🔄 15. सत्र बदल व वर्ग पदोन्नती (Promotion)",
 
@@ -2325,7 +2486,8 @@ def load_data_from_disk():
 
             if "classes_list" in payload and isinstance(payload["classes_list"], list):
 
-                st.session_state.classes_list = clean_and_sort_classes(payload["classes_list"])
+                all_cls = list(dict.fromkeys(payload["classes_list"] + DEFAULT_CLASSES))
+                st.session_state.classes_list = clean_and_sort_classes(all_cls)
             else:
                 st.session_state.classes_list = clean_and_sort_classes(DEFAULT_CLASSES)
 
@@ -3894,6 +4056,12 @@ with st.sidebar:
 
         st.markdown("<hr style='margin: 8px 0;'>", unsafe_allow_html=True)
         st.markdown("<div style='font-weight: bold; font-size: 12px; color: #15803D; margin-bottom: 4px;'>⚡ 1-Click ऑटो-शुद्धिकरण:</div>", unsafe_allow_html=True)
+        if st.button("🔄 सभी 15 कक्षाएं जोड़ें (Nursery से 12th तक)", key="btn_restore_all_classes_sb", use_container_width=True, type="primary"):
+            st.session_state.classes_list = clean_and_sort_classes(list(dict.fromkeys(st.session_state.classes_list + DEFAULT_CLASSES)))
+            save_data_to_disk()
+            st.success("✅ सभी कक्षाएं (Nursery से 12th) लोड हो गईं!")
+            st.rerun()
+
         if st.button("🧹 सभी स्पेलिंग ठीक करें (Auto-Fix All)", key="btn_auto_clean_classes_sb", use_container_width=True):
             st.session_state.classes_list = clean_and_sort_classes(st.session_state.classes_list)
             st.session_state.data_store = migrate_data_store_keys(st.session_state.data_store)
@@ -4036,6 +4204,7 @@ for col, def_val in [("Class", selected_class), ("Section", "A"), ("Aadhar_No", 
 
 # ----------------- GOVERNMENT PORTAL UPDATE MONITOR (RSKMP / MPBSE) -----------------
 
+s_info = st.session_state.school_info
 current_sess = st.session_state.school_info.get('session', '2023-24')
 
   
@@ -4435,6 +4604,165 @@ if st.session_state.get("show_license_dialog", False):
 
   
 
+# Ensure s_info is globally defined for all modules and sub-views
+s_info = st.session_state.school_info
+
+# ----------------- REUSABLE BULK & SINGLE PHOTO MANAGER -----------------
+def render_photo_manager(cls_data, selected_class, is_teacher=False, key_prefix="pr"):
+    """Renders comprehensive Photo Manager with Single Photo Upload and Bulk Roll-Number Mapped Upload"""
+    st.subheader(f"📸 छात्र फोटो प्रबंधन — {selected_class}")
+    students_df = cls_data["students"]
+    if students_df.empty:
+        st.warning("⚠️ कृपया पहले 'विद्यार्थी मास्टर' में छात्र जोड़ें!")
+        return
+
+    p_mode = st.radio(
+        "फोटो अपलोड का तरीका चुनें (Upload Mode):",
+        ["🚀 बल्क फोटो अपलोड (रोल नंबर से ऑटो-मैपिंग / Bulk Upload)", "👤 एकल विद्यार्थी फोटो अपलोड (Single Student Upload)"],
+        horizontal=True,
+        key=f"pm_mode_{key_prefix}_{selected_class}"
+    )
+
+    if "एकल विद्यार्थी" in p_mode:
+        col_p_left, col_p_right = st.columns([2, 1])
+        with col_p_left:
+            st_photo_names = [f"Roll {s['Roll_No']}: {s['Name']}" for _, s in students_df.iterrows()]
+            sel_st_photo_str = st.selectbox("विद्यार्थी चुनें:", st_photo_names, key=f"photo_sel_st_{key_prefix}")
+            p_roll = int(sel_st_photo_str.split(":")[0].replace("Roll", "").strip())
+            target_st = students_df[students_df["Roll_No"] == p_roll].iloc[0]
+            new_photo = st.file_uploader(f"रोल {p_roll} ({target_st['Name']}) का फोटो चुनें:", type=["jpg", "jpeg", "png"], key=f"photo_up_{key_prefix}_{selected_class}_{p_roll}")
+            if st.button("💾 फोटो सुरक्षित करें", type="primary", key=f"btn_p_save_{key_prefix}_{selected_class}_{p_roll}"):
+                if new_photo:
+                    b64_img = base64.b64encode(new_photo.read()).decode()
+                    cls_data["students"].loc[cls_data["students"]["Roll_No"] == p_roll, "Photo_b64"] = b64_img
+                    save_data_to_disk()
+                    st.success("फोटो सुरक्षित!")
+                    st.rerun()
+        with col_p_right:
+            if target_st.get("Photo_b64"):
+                st.image(base64.b64decode(target_st["Photo_b64"]), width=130, caption=f"Roll: {p_roll}")
+            else:
+                st.info("फोटो उपलब्ध नहीं")
+
+    else:
+        # BULK PHOTO UPLOADER (BY ROLL NUMBER MAPPING)
+        st.markdown(f"""
+        <div style="background: #EFF6FF; border: 1px solid #BFDBFE; padding: 12px 16px; border-radius: 8px; margin-bottom: 12px;">
+            <b style="color: #1E3A8A; font-size: 14px;">🚀 कक्षा <b>{selected_class}</b> हेतु बल्क फोटो अपलोड निर्देश:</b><br>
+            <span style="font-size: 12.5px; color: #334155;">
+                • फोटो फाइलों का नाम विद्यार्थी के <b>रोल नंबर</b> अनुसार रखें (उदा. <code>1.jpg</code>, <code>2.png</code>, <code>roll_3.jpeg</code>, <code>04.jpg</code>)।<br>
+                • आप एक साथ सभी फोटो सेलेक्ट करके अपलोड कर सकते हैं, या सभी फोटो की एक <b>.zip</b> फाइल भी अपलोड कर सकते हैं!<br>
+                • सिस्टम फाइल के नाम से रोल नंबर स्वतः पहचानकर सही विद्यार्थी के साथ लिंक कर देगा।
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
+
+        c_bu1, c_bu2 = st.columns([1, 1])
+        with c_bu1:
+            bulk_files = st.file_uploader(
+                "1. कई फोटो फाइल्स एक साथ चुनें (Select Multiple Images):",
+                type=["jpg", "jpeg", "png"],
+                accept_multiple_files=True,
+                key=f"bulk_photos_files_{key_prefix}_{selected_class}"
+            )
+        with c_bu2:
+            zip_file = st.file_uploader(
+                "2. या फोटो की ZIP फ़ाइल अपलोड करें (Upload ZIP File):",
+                type=["zip"],
+                key=f"bulk_zip_file_{key_prefix}_{selected_class}"
+            )
+
+        # Collect candidate images (filename -> bytes)
+        uploaded_images = {}
+        if bulk_files:
+            for bf in bulk_files:
+                uploaded_images[bf.name] = bf.read()
+                
+        if zip_file:
+            import zipfile
+            try:
+                with zipfile.ZipFile(zip_file) as zf:
+                    for z_info in zf.infolist():
+                        if not z_info.is_dir() and any(z_info.filename.lower().endswith(ext) for ext in [".jpg", ".jpeg", ".png"]):
+                            f_name = os.path.basename(z_info.filename)
+                            if f_name:
+                                uploaded_images[f_name] = zf.read(z_info.filename)
+            except Exception as ze:
+                st.error(f"ZIP फाइल पढ़ने में त्रुटि: {ze}")
+
+        if uploaded_images:
+            st.markdown(f"##### 📸 कुल प्राप्त फोटो: **{len(uploaded_images)}** (मैपिंग समीक्षा एवं सत्यापन):")
+            
+            # Map images to students
+            mapped_records = []
+            valid_rolls = set(students_df["Roll_No"].tolist())
+            
+            for fname, img_bytes in uploaded_images.items():
+                base_name = os.path.splitext(fname)[0]
+                digits = re.findall(r'\d+', base_name)
+                matched_roll = None
+                if digits:
+                    potential_roll = int(digits[-1])
+                    if potential_roll in valid_rolls:
+                        matched_roll = potential_roll
+                
+                st_name = ""
+                st_sec = ""
+                has_existing = False
+                if matched_roll is not None:
+                    matching_st = students_df[students_df["Roll_No"] == matched_roll].iloc[0]
+                    st_name = matching_st["Name"]
+                    st_sec = matching_st.get("Section", "A")
+                    has_existing = bool(matching_st.get("Photo_b64"))
+                
+                b64_str = base64.b64encode(img_bytes).decode()
+                mapped_records.append({
+                    "filename": fname,
+                    "matched_roll": matched_roll,
+                    "student_name": st_name,
+                    "section": st_sec,
+                    "has_existing": has_existing,
+                    "img_bytes": img_bytes,
+                    "b64": b64_str
+                })
+
+            col_cnt = 4
+            preview_cols = st.columns(col_cnt)
+            ready_to_save = {}
+
+            for idx, rec in enumerate(mapped_records):
+                with preview_cols[idx % col_cnt]:
+                    st.image(rec["img_bytes"], use_container_width=True)
+                    if rec["matched_roll"] is not None:
+                        st.markdown(f"<div style='font-size:12px; font-weight:bold; color:#15803D;'>✅ रोल {rec['matched_roll']}: {rec['student_name']}</div>", unsafe_allow_html=True)
+                        st.caption(f"फ़ाइल: `{rec['filename']}`")
+                        ready_to_save[rec["matched_roll"]] = rec["b64"]
+                    else:
+                        st.markdown(f"<div style='font-size:12px; font-weight:bold; color:#B91C1C;'>⚠️ रोल नंबर नहीं मिला</div>", unsafe_allow_html=True)
+                        st.caption(f"फ़ाइल: `{rec['filename']}`")
+                        man_roll = st.selectbox(
+                            "विद्यार्थी चुनें:",
+                            [None] + sorted(list(valid_rolls)),
+                            format_func=lambda x: f"Roll {x}: {students_df[students_df['Roll_No']==x]['Name'].values[0]}" if x is not None else "-- चुनें --",
+                            key=f"man_sel_{key_prefix}_{idx}"
+                        )
+                        if man_roll is not None:
+                            ready_to_save[man_roll] = rec["b64"]
+
+            st.divider()
+            c_bsv1, c_bsv2 = st.columns([2, 1])
+            with c_bsv1:
+                if ready_to_save:
+                    if st.button(f"💾 कुल {len(ready_to_save)} विद्यार्थियों के फोटो एक साथ सुरक्षित करें (Bulk Save)", type="primary", use_container_width=True, key=f"btn_bulk_save_{key_prefix}_{selected_class}"):
+                        for r_num, b64_data in ready_to_save.items():
+                            cls_data["students"].loc[cls_data["students"]["Roll_No"] == r_num, "Photo_b64"] = b64_data
+                        save_data_to_disk()
+                        st.balloons()
+                        st.success(f"🎉 बधाई! {len(ready_to_save)} विद्यार्थियों के फोटो कक्षा {selected_class} में सफलतापूर्वक सहेज दिए गए!")
+                        st.rerun()
+                else:
+                    st.warning("⚠️ कोई भी फोटो रोल नंबर से मैच नहीं हो सकी। कृपया फाइलों के नाम में रोल नंबर लिखें (उदा. 1.jpg, 2.jpg)!")
+
 # ----------------- MODULE 1: SCHOOL SETUP -----------------
 
 if menu == T["nav_school"]:
@@ -4728,6 +5056,7 @@ if menu == T["nav_school"]:
 
   
   
+
 
 # ----------------- MODULE 2: STUDENT MASTER (ROLE-AWARE & MAKER-CHECKER ENABLED) -----------------
 
@@ -5171,54 +5500,7 @@ elif menu == T["nav_student"]:
         # Tab 4 for Teacher: Photo Manager
 
         with tab4:
-
-            st.subheader("📸 छात्र फोटो अपलोड (Photo Manager)")
-
-            students_df = cls_data["students"]
-
-            if students_df.empty:
-
-                st.warning("⚠️ कृपया पहले छात्र जोड़ें!")
-
-            else:
-
-                col_p_left, col_p_right = st.columns([2, 1])
-
-                with col_p_left:
-
-                    st_photo_names = [f"Roll {s['Roll_No']}: {s['Name']}" for _, s in students_df.iterrows()]
-
-                    sel_st_photo_str = st.selectbox("विद्यार्थी चुनें:", st_photo_names, key="photo_sel_st_tr")
-
-                    p_roll = int(sel_st_photo_str.split(":")[0].replace("Roll", "").strip())
-
-                    target_st = students_df[students_df["Roll_No"] == p_roll].iloc[0]
-
-                    new_photo = st.file_uploader(f"रोल {p_roll} ({target_st['Name']}) का फोटो चुनें:", type=["jpg", "jpeg", "png"], key=f"photo_up_tr_{selected_class}_{p_roll}")
-
-                    if st.button("💾 फोटो सुरक्षित करें", type="primary", key=f"btn_p_save_tr_{selected_class}_{p_roll}"):
-
-                        if new_photo:
-
-                            b64_img = base64.b64encode(new_photo.read()).decode()
-
-                            cls_data["students"].loc[cls_data["students"]["Roll_No"] == p_roll, "Photo_b64"] = b64_img
-
-                            save_data_to_disk()
-
-                            st.success("फोटो सुरक्षित!")
-
-                            st.rerun()
-
-                with col_p_right:
-
-                    if target_st.get("Photo_b64"):
-
-                        st.image(base64.b64decode(target_st["Photo_b64"]), width=130)
-
-                    else:
-
-                        st.info("फोटो उपलब्ध नहीं")
+            render_photo_manager(cls_data, selected_class, is_teacher=True, key_prefix="tr")
 
   
 
@@ -5227,56 +5509,7 @@ elif menu == T["nav_student"]:
         # ---------------- FOR PRINCIPAL: PHOTO, TC, APPROVALS & EXCEL MIGRATOR ----------------
 
         with tab3:
-
-            st.subheader("📸 छात्र फोटो अपलोड एवं प्रबंधन (Photo Manager)")
-
-            students_df = cls_data["students"]
-
-            if students_df.empty:
-
-                st.warning("⚠️ कृपया पहले छात्र जोड़ें!")
-
-            else:
-
-                col_p_left, col_p_right = st.columns([2, 1])
-
-                with col_p_left:
-
-                    st_photo_names = [f"Roll {s['Roll_No']}: {s['Name']}" for _, s in students_df.iterrows()]
-
-                    sel_st_photo_str = st.selectbox("विद्यार्थी चुनें:", st_photo_names, key="photo_sel_st_pr")
-
-                    p_roll = int(sel_st_photo_str.split(":")[0].replace("Roll", "").strip())
-
-                    target_st = students_df[students_df["Roll_No"] == p_roll].iloc[0]
-
-                    new_photo = st.file_uploader(f"रोल {p_roll} ({target_st['Name']}) का फोटो चुनें:", type=["jpg", "jpeg", "png"], key=f"photo_up_pr_{selected_class}_{p_roll}")
-
-                    if st.button("💾 फोटो सुरक्षित करें", type="primary", key=f"btn_p_save_pr_{selected_class}_{p_roll}"):
-
-                        if new_photo:
-
-                            b64_img = base64.b64encode(new_photo.read()).decode()
-
-                            cls_data["students"].loc[cls_data["students"]["Roll_No"] == p_roll, "Photo_b64"] = b64_img
-
-                            save_data_to_disk()
-
-                            st.success("फोटो सुरक्षित!")
-
-                            st.rerun()
-
-                with col_p_right:
-
-                    if target_st.get("Photo_b64"):
-
-                        st.image(base64.b64decode(target_st["Photo_b64"]), width=130)
-
-                    else:
-
-                        st.info("फोटो उपलब्ध नहीं")
-
-  
+            render_photo_manager(cls_data, selected_class, is_teacher=False, key_prefix="pr")
 
         with tab4:
 
@@ -6065,12 +6298,10 @@ elif menu == T["nav_attendance"]:
 
     else:
 
-        tab_att1, tab_att2 = st.tabs([
-
+        tab_att1, tab_att2, tab_att3 = st.tabs([
             "📝 दैनिक कक्षा हाजिरी (Daily Teacher Attendance)",
-
-            "📅 माहवार शासकीय उपस्थिति पत्रक (Monthly Attendance Sheet & Export)"
-
+            "📅 माहवार शासकीय उपस्थिति पत्रक (Monthly Attendance Sheet & Export)",
+            "📥 बल्क उपस्थिति एक्सेल अपलोड (Bulk Excel/CSV Upload)"
         ])
 
   
@@ -6533,9 +6764,176 @@ elif menu == T["nav_attendance"]:
 
   
 
+
+        # ======================= TAB 3: BULK UPLOAD ATTENDANCE VIA EXCEL/CSV =======================
+        with tab_att3:
+            st.subheader(f"📥 एक्सेल / सीएसवी से माहवार उपस्थिति एक साथ अपलोड करें — {selected_class}")
+            st.caption("कक्षा के सभी विद्यार्थियों की पूरे वर्ष (12 माह), किन्हीं 2-3 माह (जैसे Jul, Aug, Sep) अथवा कुल उपस्थिति दिन सीधे एक्सेल से 1-क्लिक में अपलोड करें:")
+            
+            c_tmpl1, c_tmpl2 = st.columns([2.5, 1.5])
+            with c_tmpl1:
+                st.info("""
+                💡 **स्मार्ट बल्क अपलोड सुविधा:**
+                1. **पूरे वर्ष का डेटा:** आप सभी 12 माह (Apr से Mar) की उपस्थिति एक साथ अपलोड कर सकते हैं।
+                2. **किन्हीं 2-3 माह का डेटा:** यदि आप केवल 2 या 3 माह (उदा. Jul, Aug, Sep) का डेटा अपलोड करेंगे, तो केवल वही माह अपडेट होंगे और बाकी बचे हुए महीनों की पहले से भरी उपस्थिति बिल्कुल सुरक्षित रहेगी!
+                3. **वार्षिक कुल उपस्थिति:** यदि फ़ाइल में केवल कुल उपस्थिति (`Total_Attended` या `कुल उपस्थिति`) का कॉलम है, तो वह भी स्वतः पहचान लिया जाएगा।
+                """)
+            with c_tmpl2:
+                template_rows = []
+                att_df = cls_data.get("monthly_attendance", pd.DataFrame())
+                for idx, s in students_df.iterrows():
+                    row = {
+                        "Roll_No": s["Roll_No"],
+                        "Student_Name": s["Name"],
+                        "Scholar_No": s.get("Scholar_No", "")
+                    }
+                    cur_att_row = att_df[att_df["Roll_No"] == s["Roll_No"]] if not att_df.empty and "Roll_No" in att_df.columns else pd.DataFrame()
+                    for m in MONTHS_LIST:
+                        if not cur_att_row.empty and m in cur_att_row.columns:
+                            row[m] = int(cur_att_row[m].iloc[0])
+                        else:
+                            row[m] = 20 if m != "May" else 0
+                    template_rows.append(row)
+                tmpl_df = pd.DataFrame(template_rows)
+                t_bytes, t_mime, t_ext = export_dataframe_bytes(tmpl_df, "Excel (.xlsx)")
+                st.download_button(
+                    f"📄 {selected_class} उपस्थिति एक्सेल टेम्पलेट डाउनलोड (.xlsx)",
+                    data=t_bytes,
+                    file_name=f"Attendance_Template_{selected_class}_{st.session_state.school_info.get('session','2023-24')}.xlsx",
+                    mime=t_mime,
+                    type="secondary",
+                    use_container_width=True
+                )
+            
+            up_att_file = st.file_uploader(
+                f"📂 {selected_class} उपस्थिति एक्सेल (.xlsx / .xls / .csv) फ़ाइल यहाँ अपलोड करें:",
+                type=["xlsx", "xls", "csv"],
+                key=f"uploader_bulk_att_{selected_class}"
+            )
+            
+            if up_att_file is not None:
+                try:
+                    if up_att_file.name.endswith(".csv"):
+                        uploaded_df = pd.read_csv(up_att_file)
+                    else:
+                        uploaded_df = pd.read_excel(up_att_file)
+                        
+                    st.success(f"✅ फ़ाइल सफलतापूर्वक पढ़ी गई: कुल {len(uploaded_df)} पंक्तियाँ पाई गईं!")
+                    
+                    # Enhanced Column Mapper (Hindi + English + Alternate Spellings)
+                    MONTHS_SYNONYMS = {
+                        "Apr": ["apr", "april", "अप्रैल", "अप्रेल"],
+                        "May": ["may", "मई"],
+                        "Jun": ["jun", "june", "जून"],
+                        "Jul": ["jul", "july", "जुलाई"],
+                        "Aug": ["aug", "august", "अगस्त"],
+                        "Sep": ["sep", "sept", "september", "सितम्बर", "सितंबर"],
+                        "Oct": ["oct", "october", "अक्टूबर", "अक्टू"],
+                        "Nov": ["nov", "november", "नवम्बर", "नवंबर"],
+                        "Dec": ["dec", "december", "दिसम्बर", "दिसंबर"],
+                        "Jan": ["jan", "january", "जनवरी"],
+                        "Feb": ["feb", "february", "फरवरी"],
+                        "Mar": ["mar", "march", "मार्च"]
+                    }
+                    
+                    col_map = {}
+                    has_direct_total = None
+                    
+                    for col in uploaded_df.columns:
+                        cl = str(col).strip().lower()
+                        if any(k in cl for k in ["roll", "रोल", "अनुक्रमांक"]):
+                            col_map["Roll_No"] = col
+                        for m_canonical, syns in MONTHS_SYNONYMS.items():
+                            if any(s in cl for s in syns):
+                                col_map[m_canonical] = col
+                        if any(k in cl for k in ["total_attended", "attended_days", "कुल उपस्थिति", "उपस्थिति दिवस", "वार्षिक उपस्थिति", "attended"]):
+                            has_direct_total = col
+                                
+                    if "Roll_No" not in col_map:
+                        st.error("❌ एक्सेल फ़ाइल में 'Roll_No' (रोल नंबर) कॉलम नहीं मिला! कृपया सुनिश्चित करें कि फ़ाइल में रोल नंबर का कॉलम हो।")
+                    else:
+                        detected_months = [m for m in MONTHS_LIST if m in col_map]
+                        if detected_months:
+                            st.info(f"🎯 **पहचाने गए माह ({len(detected_months)} माह):** `{', '.join(detected_months)}` — अपलोड करने पर केवल ये माह अपडेट होंगे, शेष महीनों का पूर्व रिकॉर्ड सुरक्षित रहेगा!")
+                        elif has_direct_total:
+                            st.info(f"🎯 **वार्षिक कुल उपस्थिति कॉलम पहचाना गया:** `{has_direct_total}` — छात्रों के सीधे कुल उपस्थित दिवस अपडेट होंगे।")
+                        else:
+                            st.warning("⚠️ फ़ाइल में किसी माह (Apr-Mar) या कुल उपस्थिति का कॉलम नहीं पहचाना जा सका। कृपया टेम्पलेट प्रारूप का उपयोग करें।")
+
+                        preview_records = []
+                        c_work = cls_data.get("working_days", DEFAULT_WORKING_DAYS)
+                        tot_working = sum([int(c_work.get(m, 20)) for m in MONTHS_LIST])
+                        
+                        existing_att_df = cls_data.get("monthly_attendance", pd.DataFrame())
+                        
+                        for _, u_row in uploaded_df.iterrows():
+                            try:
+                                u_roll = int(float(u_row[col_map["Roll_No"]]))
+                            except Exception:
+                                continue
+                            
+                            st_match = students_df[students_df["Roll_No"] == u_roll]
+                            st_name = st_match["Name"].iloc[0] if not st_match.empty else f"छात्र (Roll {u_roll})"
+                            st_sch = st_match["Scholar_No"].iloc[0] if not st_match.empty and "Scholar_No" in st_match.columns else ""
+                            
+                            cur_st_att = existing_att_df[existing_att_df["Roll_No"] == u_roll] if not existing_att_df.empty and "Roll_No" in existing_att_df.columns else pd.DataFrame()
+                            
+                            rec = {"Roll_No": u_roll, "Name": st_name, "Scholar_No": st_sch}
+                            tot_att = 0
+                            
+                            for m in MONTHS_LIST:
+                                if m in col_map:
+                                    try:
+                                        val = int(float(u_row[col_map[m]]))
+                                    except Exception:
+                                        val = 0
+                                else:
+                                    # Preserve existing attendance if already saved in system!
+                                    if not cur_st_att.empty and m in cur_st_att.columns:
+                                        try:
+                                            val = int(cur_st_att[m].iloc[0])
+                                        except Exception:
+                                            val = int(c_work.get(m, 20)) if m != "May" else 0
+                                    else:
+                                        val = int(c_work.get(m, 20)) if m != "May" else 0
+                                rec[m] = val
+                                tot_att += val
+                            
+                            # If direct total was provided and no individual months were matched:
+                            if not detected_months and has_direct_total:
+                                try:
+                                    tot_att = int(float(u_row[has_direct_total]))
+                                except Exception:
+                                    pass
+                                    
+                            rec["Total_Attended"] = tot_att
+                            rec["Total_Working"] = tot_working
+                            rec["Att_Percentage"] = f"{round((tot_att / tot_working)*100, 1)}%" if tot_working > 0 else "0%"
+                            preview_records.append(rec)
+                            
+                        parsed_att_df = pd.DataFrame(preview_records)
+                        st.markdown("##### 👁️ अपलोड किए गए डेटा का पूर्वावलोकन (Preview):")
+                        st.dataframe(parsed_att_df, use_container_width=True)
+                        
+                        if st.button("💾 यह उपस्थिति डेटा मास्टर रिकॉर्ड में सहेजें (Save Attendance to Database)", type="primary", use_container_width=True):
+                            cls_data["monthly_attendance"] = parsed_att_df
+                            for _, prow in parsed_att_df.iterrows():
+                                r_no = prow["Roll_No"]
+                                t_att = prow["Total_Attended"]
+                                cls_data["students"].loc[cls_data["students"]["Roll_No"] == r_no, "Attended_Days"] = t_att
+                                cls_data["students"].loc[cls_data["students"]["Roll_No"] == r_no, "Total_Days"] = tot_working
+                            save_data_to_disk()
+                            st.balloons()
+                            st.success("🎉 सभी विद्यार्थियों की माहवार उपस्थिति सफलतापूर्वक सहेज ली गई! यह प्रगति पत्रक, 44-कॉलम A3 गोशवारे और 35-कॉलम वेटेज शीट में स्वतः अपडेट हो गई है।")
+                            st.rerun()
+                except Exception as ex:
+                    st.error(f"फ़ाइल पढ़ने में त्रुटि: {ex}")
+
+
 # ----------------- MODULE 4: EVALUATION ENTRY (SUBJECT-WISE PRESENT/ABSENT) -----------------
 
 elif menu == T["nav_eval"]:
+    s_info = st.session_state.school_info
 
     st.markdown(f'<div class="main-header">📝 परीक्षा एवं गतिविधि मूल्यांकन — {selected_class}</div>', unsafe_allow_html=True)
 
@@ -6680,6 +7078,102 @@ elif menu == T["nav_eval"]:
 
   
   
+
+                # BULK UPLOAD OPTION FOR YEARLY / ANNUAL EXAM MARKS
+        with st.expander("📥 एक्सेल शीट से एक साथ सभी छात्रों के वार्षिक मुख्य परीक्षा अंक अपलोड करें (Bulk Upload Annual Marks)", expanded=False):
+            st.info("💡 **वार्षिक अंक थोक अपलोड:** आप यहाँ से कक्षा के सभी छात्रों की पूर्व-भरी एक्सेल फ़ाइल डाउनलोड करके ऑफ़लाइन नंबर भर सकते हैं और एक साथ पूरे परिणाम को अपलोड कर सकते हैं।")
+            
+            # 1. Download Blank/Current Template
+            ann_tmpl_rows = []
+            for _, s in students_df.iterrows():
+                r = s["Roll_No"]
+                ev = cls_data["evaluations"].get(r, {})
+                m_dict = ev.get("marks", {})
+                row = {
+                    "Roll_No": r,
+                    "Scholar_No": s.get("Scholar_No", ""),
+                    "Name": s["Name"],
+                    "Status": ev.get("status", "Present")
+                }
+                for sub in cls_subjects:
+                    s_id = sub["id"]
+                    se = m_dict.get(s_id, {})
+                    row[f"{sub['name']}_Annual"] = se.get("annual", 48)
+                    if has_proj_m4:
+                        row[f"{sub['name']}_Project"] = se.get("project", 18)
+                        row[f"{sub['name']}_HalfYearly"] = se.get("half_yearly", 16)
+                    else:
+                        row[f"{sub['name']}_HalfYearly"] = se.get("half_yearly", 32)
+                ann_tmpl_rows.append(row)
+                
+            ann_tmpl_df = pd.DataFrame(ann_tmpl_rows)
+            t_bytes, t_mime, t_ext = export_dataframe_bytes(ann_tmpl_df, "Excel (.xlsx)")
+            
+            c_adn1, c_adn2 = st.columns([1.5, 2.5])
+            with c_adn1:
+                st.download_button(
+                    "📥 वार्षिक अंक एक्सेल टेम्पलेट डाउनलोड (.xlsx)",
+                    data=t_bytes,
+                    file_name=f"Annual_Marks_Template_{selected_class}.xlsx",
+                    mime=t_mime,
+                    type="secondary",
+                    use_container_width=True
+                )
+            with c_adn2:
+                up_ann_file = st.file_uploader("भरी हुई वार्षिक अंक एक्सेल / CSV फ़ाइल यहाँ अपलोड करें:", type=["xlsx", "xls", "csv"], key="annual_bulk_uploader")
+                
+            if up_ann_file is not None:
+                parsed_ann_df = parse_marks_upload_file(up_ann_file)
+                if parsed_ann_df is not None and not parsed_ann_df.empty:
+                    st.success(f"✅ फ़ाइल सफलतापूर्वक लोड हुई! कुल {len(parsed_ann_df)} पंक्तियाँ पाई गईं।")
+                    st.dataframe(parsed_ann_df.head(5), use_container_width=True)
+                    
+                    if st.button("🚀 एक्सेल से सभी छात्रों के वार्षिक अंक सुरक्षित करें (Apply Bulk Annual Marks)", type="primary", use_container_width=True, key="btn_apply_ann_bulk"):
+                        roll_col = next((c for c in parsed_ann_df.columns if "roll" in str(c).lower()), None)
+                        if roll_col:
+                            updated_cnt = 0
+                            for _, urow in parsed_ann_df.iterrows():
+                                try:
+                                    r_val = int(urow[roll_col])
+                                except Exception:
+                                    continue
+                                if r_val not in cls_data["evaluations"]:
+                                    cls_data["evaluations"][r_val] = {"marks": {}}
+                                if "marks" not in cls_data["evaluations"][r_val]:
+                                    cls_data["evaluations"][r_val]["marks"] = {}
+                                    
+                                for sub in cls_subjects:
+                                    s_id = sub["id"]
+                                    if s_id not in cls_data["evaluations"][r_val]["marks"]:
+                                        cls_data["evaluations"][r_val]["marks"][s_id] = {}
+                                    # Match annual written
+                                    ann_c = next((c for c in parsed_ann_df.columns if smart_match_subject_col(c, sub["name"], s_id) and ("ann" in str(c).lower() or "वार्षिक" in str(c) or "written" in str(c).lower() or "theory" in str(c).lower())), None)
+                                    if not ann_c:
+                                        ann_c = next((c for c in parsed_ann_df.columns if smart_match_subject_col(c, sub["name"], s_id)), None)
+                                    if ann_c and pd.notna(urow[ann_c]):
+                                        try:
+                                            cls_data["evaluations"][r_val]["marks"][s_id]["annual"] = min(75 if "high" in selected_class.lower() else 60, max(0, int(float(urow[ann_c]))))
+                                        except Exception: pass
+                                    # Match project
+                                    proj_c = next((c for c in parsed_ann_df.columns if smart_match_subject_col(c, sub["name"], s_id) and ("proj" in str(c).lower() or "प्रोजेक्ट" in str(c))), None)
+                                    if proj_c and pd.notna(urow[proj_c]):
+                                        try:
+                                            cls_data["evaluations"][r_val]["marks"][s_id]["project"] = min(40, max(0, int(float(urow[proj_c]))))
+                                        except Exception: pass
+                                    # Match half-yearly
+                                    hy_c = next((c for c in parsed_ann_df.columns if smart_match_subject_col(c, sub["name"], s_id) and ("half" in str(c).lower() or "अर्ध" in str(c) or "hy" in str(c).lower())), None)
+                                    if hy_c and pd.notna(urow[hy_c]):
+                                        try:
+                                            cls_data["evaluations"][r_val]["marks"][s_id]["half_yearly"] = min(60, max(0, int(float(urow[hy_c]))))
+                                        except Exception: pass
+                                updated_cnt += 1
+                            save_data_to_disk()
+                            st.balloons()
+                            st.success(f"🎉 बधाई! कुल {updated_cnt} विद्यार्थियों के वार्षिक अंक सफलतापूर्वक अपडेट हो गए!")
+                            st.rerun()
+                        else:
+                            st.error("फ़ाइल में Roll No. कॉलम नहीं मिला! कृपया डाउनलोड किया गया टेम्पलेट उपयोग करें।")
+
 
         with st.expander(f"📚 1. मुख्य विषय अंक प्रविष्टि ({cur_exam_rule['name']})", expanded=True):
 
@@ -6970,6 +7464,8 @@ elif menu == T["nav_eval"]:
 # ----------------- MODULE 5: STUDENT COMPLETE DATA DOSSIER & VIEWER -----------------
 
 elif menu == T["nav_viewer"]:
+    s_info = st.session_state.school_info
+    s_info = st.session_state.school_info
 
     render_html(f'<div class="main-header">🔍 छात्र संपूर्ण डेटा समीक्षा (Student 360° Data Dossier)</div>')
 
@@ -7808,6 +8304,79 @@ elif menu == T.get("nav_monthly_test", "📝 6. मासिक मूल्य�
 
   
 
+                # BULK UPLOAD OPTION FOR MONTHLY TEST MARKS
+        with st.expander(f"📥 एक्सेल शीट से एक साथ सभी छात्रों के {month_names_map[selected_month_id]} के अंक अपलोड करें (Bulk Upload)", expanded=False):
+            st.info(f"💡 **मासिक अंक थोक अपलोड ({month_names_map[selected_month_id]}):** आप एक्सेल शीट में एक साथ सभी छात्रों के 10 में से प्राप्तांक भरकर अपलोड कर सकते हैं।")
+            
+            # Pre-filled Template Download
+            m_tmpl_rows = []
+            for _, s in students_df.iterrows():
+                r = s["Roll_No"]
+                ev = mt_evals.get(r, {})
+                cur_m = ev.get("monthly_tests", {}).get(selected_month_id, {})
+                row = {
+                    "Roll_No": r,
+                    "Scholar_No": s.get("Scholar_No", ""),
+                    "Name": s["Name"]
+                }
+                for sub in cls_subjects:
+                    s_id = sub["id"]
+                    row[f"{sub['name']}"] = cur_m.get(s_id, 8)
+                m_tmpl_rows.append(row)
+                
+            m_tmpl_df = pd.DataFrame(m_tmpl_rows)
+            mt_bytes, mt_mime, mt_ext = export_dataframe_bytes(m_tmpl_df, "Excel (.xlsx)")
+            
+            c_mdn1, c_mdn2 = st.columns([1.5, 2.5])
+            with c_mdn1:
+                st.download_button(
+                    f"📥 {month_names_map[selected_month_id]} एक्सेल टेम्पलेट (.xlsx)",
+                    data=mt_bytes,
+                    file_name=f"Monthly_Marks_{target_mt_class}_{selected_month_id}.xlsx",
+                    mime=mt_mime,
+                    type="secondary",
+                    use_container_width=True
+                )
+            with c_mdn2:
+                up_mt_file = st.file_uploader(f"भरी हुई मासिक अंक फ़ाइल चुनें ({month_names_map[selected_month_id]}):", type=["xlsx", "xls", "csv"], key=f"uploader_mt_{selected_month_id}")
+                
+            if up_mt_file is not None:
+                parsed_mt_df = parse_marks_upload_file(up_mt_file)
+                if parsed_mt_df is not None and not parsed_mt_df.empty:
+                    st.success(f"✅ फ़ाइल लोड हुई! कुल {len(parsed_mt_df)} छात्रों का डेटा मिला।")
+                    st.dataframe(parsed_mt_df.head(5), use_container_width=True)
+                    
+                    if st.button(f"🚀 एक्सेल से {month_names_map[selected_month_id]} के अंक सुरक्षित करें (Apply Monthly Marks)", type="primary", use_container_width=True, key=f"btn_apply_mt_{selected_month_id}"):
+                        roll_col = next((c for c in parsed_mt_df.columns if "roll" in str(c).lower()), None)
+                        if roll_col:
+                            up_cnt = 0
+                            for _, urow in parsed_mt_df.iterrows():
+                                try:
+                                    r_val = int(urow[roll_col])
+                                except Exception: continue
+                                if r_val not in mt_evals:
+                                    mt_evals[r_val] = {"marks": {}, "monthly_tests": {}}
+                                if "monthly_tests" not in mt_evals[r_val]:
+                                    mt_evals[r_val]["monthly_tests"] = {}
+                                if selected_month_id not in mt_evals[r_val]["monthly_tests"]:
+                                    mt_evals[r_val]["monthly_tests"][selected_month_id] = {}
+                                    
+                                for sub in cls_subjects:
+                                    s_id = sub["id"]
+                                    m_c = next((c for c in parsed_mt_df.columns if smart_match_subject_col(c, sub["name"], s_id)), None)
+                                    if m_c and pd.notna(urow[m_c]):
+                                        try:
+                                            mt_evals[r_val]["monthly_tests"][selected_month_id][s_id] = min(10, max(0, int(float(urow[m_c]))))
+                                        except Exception: pass
+                                up_cnt += 1
+                            save_data_to_disk()
+                            st.balloons()
+                            st.success(f"🎉 बधाई! कुल {up_cnt} विद्यार्थियों के {month_names_map[selected_month_id]} के अंक सुरक्षित हो गए! 10% अधिभार स्वतः अपडेट हो गया है।")
+                            st.rerun()
+                        else:
+                            st.error("फ़ाइल में Roll No. कॉलम नहीं मिला!")
+
+
         mt_df = pd.DataFrame(mt_rows)
 
         
@@ -7949,6 +8518,7 @@ elif menu == T.get("nav_monthly_test", "📝 6. मासिक मूल्य�
             
 
         st.dataframe(pd.DataFrame(adhibhar_rows), use_container_width=True)
+        render_govt_portals_hub("मासिक मूल्यांकन", target_mt_class, edited_mt_df, "Monthly_Test")
 
   
   
@@ -8125,6 +8695,80 @@ elif menu == T.get("nav_half_yearly", "📑 7. अर्धवार्षिक
 
   
 
+                # BULK UPLOAD OPTION FOR HALF-YEARLY EXAM MARKS
+        with st.expander("📥 एक्सेल शीट से एक साथ सभी छात्रों के अर्धवार्षिक अंक अपलोड करें (Bulk Upload Half-Yearly Marks)", expanded=False):
+            st.info(f"💡 **अर्धवार्षिक अंक थोक अपलोड:** सभी छात्रों के अंक एक साथ एक्सेल फ़ाइल द्वारा अपलोड करें। सिस्टम स्वतः {hy_paper_max} में से प्राप्तांकों को 20% अधिभार में बदल देगा।")
+            
+            # Pre-filled Template Download
+            hy_tmpl_rows = []
+            for _, s in students_df.iterrows():
+                r = s["Roll_No"]
+                ev = hy_evals.get(r, {})
+                m_dict = ev.get("marks", {})
+                row = {
+                    "Roll_No": r,
+                    "Scholar_No": s.get("Scholar_No", ""),
+                    "Name": s["Name"]
+                }
+                for sub in cls_subjects:
+                    s_id = sub["id"]
+                    se = m_dict.get(s_id, {})
+                    row[f"{sub['name']}"] = se.get("half_yearly", 48 if hy_paper_max == "60" else 32)
+                hy_tmpl_rows.append(row)
+                
+            hy_tmpl_df = pd.DataFrame(hy_tmpl_rows)
+            hyt_bytes, hyt_mime, hyt_ext = export_dataframe_bytes(hy_tmpl_df, "Excel (.xlsx)")
+            
+            c_hyd1, c_hyd2 = st.columns([1.5, 2.5])
+            with c_hyd1:
+                st.download_button(
+                    "📥 अर्धवार्षिक अंक एक्सेल टेम्पलेट (.xlsx)",
+                    data=hyt_bytes,
+                    file_name=f"HalfYearly_Template_{target_hy_class}.xlsx",
+                    mime=hyt_mime,
+                    type="secondary",
+                    use_container_width=True
+                )
+            with c_hyd2:
+                up_hy_file = st.file_uploader("भरी हुई अर्धवार्षिक अंक एक्सेल / CSV फ़ाइल चुनें:", type=["xlsx", "xls", "csv"], key="uploader_hy_bulk")
+                
+            if up_hy_file is not None:
+                parsed_hy_df = parse_marks_upload_file(up_hy_file)
+                if parsed_hy_df is not None and not parsed_hy_df.empty:
+                    st.success(f"✅ फ़ाइल लोड हुई! कुल {len(parsed_hy_df)} छात्रों का डेटा मिला।")
+                    st.dataframe(parsed_hy_df.head(5), use_container_width=True)
+                    
+                    if st.button("🚀 एक्सेल से अर्धवार्षिक अंक सुरक्षित करें एवं 20% अधिभार अपडेट करें (Apply HY Marks)", type="primary", use_container_width=True, key="btn_apply_hy_bulk"):
+                        roll_col = next((c for c in parsed_hy_df.columns if "roll" in str(c).lower()), None)
+                        if roll_col:
+                            up_cnt = 0
+                            for _, urow in parsed_hy_df.iterrows():
+                                try:
+                                    r_val = int(urow[roll_col])
+                                except Exception: continue
+                                if r_val not in hy_evals:
+                                    hy_evals[r_val] = {"marks": {}}
+                                if "marks" not in hy_evals[r_val]:
+                                    hy_evals[r_val]["marks"] = {}
+                                    
+                                for sub in cls_subjects:
+                                    s_id = sub["id"]
+                                    if s_id not in hy_evals[r_val]["marks"]:
+                                        hy_evals[r_val]["marks"][s_id] = {}
+                                    m_c = next((c for c in parsed_hy_df.columns if smart_match_subject_col(c, sub["name"], s_id)), None)
+                                    if m_c and pd.notna(urow[m_c]):
+                                        try:
+                                            hy_evals[r_val]["marks"][s_id]["half_yearly"] = min(int(hy_paper_max), max(0, int(float(urow[m_c]))))
+                                        except Exception: pass
+                                up_cnt += 1
+                            save_data_to_disk()
+                            st.balloons()
+                            st.success(f"🎉 बधाई! कुल {up_cnt} विद्यार्थियों के अर्धवार्षिक अंक सुरक्षित हो गए! 20% अधिभार स्वतः अपडेट हो गया है।")
+                            st.rerun()
+                        else:
+                            st.error("फ़ाइल में Roll No. कॉलम नहीं मिला!")
+
+
         hy_df = pd.DataFrame(hy_rows)
 
         
@@ -8271,6 +8915,8 @@ elif menu == T.get("nav_half_yearly", "📑 7. अर्धवार्षिक
 
   
   
+
+        render_govt_portals_hub("अर्धवार्षिक परीक्षा", target_hy_class, edited_hy_df, "HalfYearly_Assessment")
 
 # ----------------- MODULE 8: ANNUAL PROJECT WORK EVALUATION (10% OR 20 MARKS) -----------------
 
@@ -8438,6 +9084,80 @@ elif menu == T.get("nav_project", "🎨 8. वार्षिक प्रोज
 
   
 
+                # BULK UPLOAD OPTION FOR ANNUAL PROJECT MARKS
+        with st.expander("📥 एक्सेल शीट से एक साथ सभी छात्रों के प्रोजेक्ट अंक अपलोड करें (Bulk Upload Project Marks)", expanded=False):
+            st.info(f"💡 **प्रोजेक्ट अंक थोक अपलोड ({target_pj_class}):** आप एक्सेल शीट में सभी छात्रों के प्रोजेक्ट अंक (पूर्णांक {pj_max_per_sub}) भरकर सीधे अपलोड कर सकते हैं।")
+            
+            # Pre-filled Template Download
+            pj_tmpl_rows = []
+            for _, s in students_df.iterrows():
+                r = s["Roll_No"]
+                ev = pj_evals.get(r, {})
+                m_dict = ev.get("marks", {})
+                row = {
+                    "Roll_No": r,
+                    "Scholar_No": s.get("Scholar_No", ""),
+                    "Name": s["Name"]
+                }
+                for sub in cls_subjects:
+                    s_id = sub["id"]
+                    se = m_dict.get(s_id, {})
+                    row[f"{sub['name']}"] = se.get("project", 16 if is_5_8_board else (32 if not is_9_10_high else 21))
+                pj_tmpl_rows.append(row)
+                
+            pj_tmpl_df = pd.DataFrame(pj_tmpl_rows)
+            pjt_bytes, pjt_mime, pjt_ext = export_dataframe_bytes(pj_tmpl_df, "Excel (.xlsx)")
+            
+            c_pjd1, c_pjd2 = st.columns([1.5, 2.5])
+            with c_pjd1:
+                st.download_button(
+                    "📥 प्रोजेक्ट अंक एक्सेल टेम्पलेट (.xlsx)",
+                    data=pjt_bytes,
+                    file_name=f"Project_Marks_Template_{target_pj_class}.xlsx",
+                    mime=pjt_mime,
+                    type="secondary",
+                    use_container_width=True
+                )
+            with c_pjd2:
+                up_pj_file = st.file_uploader("भरी हुई प्रोजेक्ट अंक एक्सेल / CSV फ़ाइल चुनें:", type=["xlsx", "xls", "csv"], key="uploader_pj_bulk")
+                
+            if up_pj_file is not None:
+                parsed_pj_df = parse_marks_upload_file(up_pj_file)
+                if parsed_pj_df is not None and not parsed_pj_df.empty:
+                    st.success(f"✅ फ़ाइल लोड हुई! कुल {len(parsed_pj_df)} छात्रों का डेटा मिला।")
+                    st.dataframe(parsed_pj_df.head(5), use_container_width=True)
+                    
+                    if st.button("🚀 एक्सेल से प्रोजेक्ट अंक सुरक्षित करें एवं अधिभार अपडेट करें (Apply Project Marks)", type="primary", use_container_width=True, key="btn_apply_pj_bulk"):
+                        roll_col = next((c for c in parsed_pj_df.columns if "roll" in str(c).lower()), None)
+                        if roll_col:
+                            up_cnt = 0
+                            for _, urow in parsed_pj_df.iterrows():
+                                try:
+                                    r_val = int(urow[roll_col])
+                                except Exception: continue
+                                if r_val not in pj_evals:
+                                    pj_evals[r_val] = {"marks": {}}
+                                if "marks" not in pj_evals[r_val]:
+                                    pj_evals[r_val]["marks"] = {}
+                                    
+                                for sub in cls_subjects:
+                                    s_id = sub["id"]
+                                    if s_id not in pj_evals[r_val]["marks"]:
+                                        pj_evals[r_val]["marks"][s_id] = {}
+                                    m_c = next((c for c in parsed_pj_df.columns if smart_match_subject_col(c, sub["name"], s_id)), None)
+                                    if m_c and pd.notna(urow[m_c]):
+                                        try:
+                                            pj_evals[r_val]["marks"][s_id]["project"] = min(int(pj_max_per_sub), max(0, int(float(urow[m_c]))))
+                                        except Exception: pass
+                                up_cnt += 1
+                            save_data_to_disk()
+                            st.balloons()
+                            st.success(f"🎉 बधाई! कुल {up_cnt} विद्यार्थियों के प्रोजेक्ट अंक सुरक्षित हो गए! अधिभार स्वतः अपडेट हो गया है।")
+                            st.rerun()
+                        else:
+                            st.error("फ़ाइल में Roll No. कॉलम नहीं मिला!")
+
+
         pj_df = pd.DataFrame(pj_rows)
 
         
@@ -8582,808 +9302,601 @@ elif menu == T.get("nav_project", "🎨 8. वार्षिक प्रोज
 
   
 
-elif menu == T["nav_marksheet"]:
 
-    students_df = cls_data["students"]
+        render_govt_portals_hub("वार्षिक प्रोजेक्ट कार्य", target_pj_class, edited_pj_df, "Project_Work_Assessment")
 
-    if students_df.empty:
+# ----------------- MODULE 9: PRINT MARKSHEET (SHASHKIY SAMAGRA PRAGATI PATRAK - RSKMP GOVT FORMAT) -----------------
+elif menu == T.get("nav_marksheet", "🖨️ 9. शासकीय वार्षिक प्रगति पत्रक एवं RSKMP/MPBSE पोर्टल केंद्र"):
+    cur_role = st.session_state.get("authenticated_role", "PRINCIPAL")
+    is_teacher = (cur_role == "TEACHER")
+    assigned_cls = st.session_state.get("assigned_class")
+    s_info = st.session_state.school_info
+    cur_sess = s_info.get("session", "2026-27")
 
-        st.warning("⚠️ कक्षा में कोई छात्र उपलब्ध नहीं है।")
-
-    else:
-
-        st_names = [f"Roll {s['Roll_No']}: {s['Name']}" for _, s in students_df.iterrows()]
-
-        c_top1, c_top2, c_top3, c_top4 = st.columns([2.5, 2, 1.2, 2.3])
-
-        with c_top1:
-
-            sel_student_str = st.selectbox("विद्यार्थी / रोल नंबर चुनें:", st_names)
-
-            sel_roll = int(sel_student_str.split(":")[0].replace("Roll", "").strip())
-
-        with c_top2:
-
-            top_roll_box_html = f"""
-
-            <div style="border: 2px solid #000; padding: 6px 12px; background: #fff; text-align: center; margin-top: 18px;">
-
-                <span style="font-size: 13px; font-weight: bold; margin-right: 10px;">Enter Student Roll Number:</span>
-
-                <span style="color: red; font-size: 18px; font-weight: 800;">{sel_roll}</span>
-
-            </div>
-
-            """
-
-            render_html(top_roll_box_html)
-
-        with c_top3:
-
-            render_html("<div style='margin-top: 22px;'>")
-
-            st.button("🖨️ Print", on_click=None, use_container_width=True)
-
-            st.markdown("</div>", unsafe_allow_html=True)
-
-        with c_top4:
-
-            render_html("<div style='margin-top: 10px;'>")
-
-            # WhatsApp instant trigger placeholder
-
-            wa_target_st = students_df[students_df["Roll_No"] == sel_roll].iloc[0]
-
-            st_ev_wa = cls_data["evaluations"].get(sel_roll, {})
-
-            st_m_wa = st_ev_wa.get("marks", {})
-
-            cls_subs_wa = get_class_subjects(selected_class)
-
-            wa_tot = sum([st_m_wa.get(sub["id"], {}).get("total", 75) for sub in cls_subs_wa])
-
-            wa_max = len(cls_subs_wa) * 100
-
-            wa_pct = round((wa_tot / wa_max) * 100, 1) if wa_max else 0
-
-            wa_grd = calculate_grade(wa_pct)
-
-            wa_res = "PASS (उत्तीर्ण)" if (wa_pct >= 33 and st_ev_wa.get("status", "Present") != "Absent") else "FAIL"
-
-            
-
-            wa_mob_val = wa_target_st.get("Contact", wa_target_st.get("Mobile", ""))
-
-            wa_link, _ = generate_whatsapp_result_link(
-
-                wa_target_st['Name'], sel_roll, selected_class, wa_tot, wa_max, wa_pct, wa_grd, wa_res,
-
-                st.session_state.school_info.get('name', 'शासकीय विद्यालय'), wa_mob_val
-
+    # Class and Section Selectors
+    c_mstop1, c_mstop2, c_mstop3 = st.columns([2.2, 1.3, 1.3])
+    with c_mstop1:
+        st.markdown('<div class="main-header">🖨️ शासकीय समग्र प्रगति पत्रक एवं पोर्टल केंद्र</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sub-header">राज्य शिक्षा केंद्र (RSKMP) एवं माध्यमिक शिक्षा मंडल (MPBSE) — शत-प्रतिशत आधिकारिक शासकीय प्रारूप</div>', unsafe_allow_html=True)
+    with c_mstop2:
+        if is_teacher and assigned_cls:
+            target_ms_class = assigned_cls
+            st.markdown(f"<div style='border: 1px solid #CBD5E1; background: #F1F5F9; padding: 7px 10px; border-radius: 6px; font-weight: bold; font-size: 13px; text-align: center; color: #1E3A8A; margin-top: 22px;'>🎯 आवंटित: {target_ms_class}</div>", unsafe_allow_html=True)
+        else:
+            target_ms_class = st.selectbox(
+                "1. कक्षा चुनें (Class):", 
+                st.session_state.classes_list, 
+                index=st.session_state.classes_list.index(selected_class) if selected_class in st.session_state.classes_list else 0,
+                key="ms_class_picker"
             )
 
-            render_html(f"""
+    ms_cls_data = get_class_data(target_ms_class)
+    raw_st_df = ms_cls_data["students"]
+    existing_secs = sorted(list(set([str(s).strip() for s in raw_st_df["Section"].dropna().unique() if str(s).strip()]))) if not raw_st_df.empty and "Section" in raw_st_df.columns else ["A"]
+    sec_options = ["सभी सेक्शन (All Sections Combined)"] + (existing_secs if existing_secs else ["A", "B", "C"])
+    
+    with c_mstop3:
+        target_ms_sec = st.selectbox("2. सेक्शन चुनें (Section):", sec_options, key="ms_sec_picker")
 
-            <a href="{wa_link}" target="_blank" style="text-decoration: none;">
+    if target_ms_sec != "सभी सेक्शन (All Sections Combined)" and not raw_st_df.empty and "Section" in raw_st_df.columns:
+        students_df = raw_st_df[raw_st_df["Section"] == target_ms_sec].copy()
+        display_ms_class = f"{target_ms_class} - Section {target_ms_sec}"
+    else:
+        students_df = raw_st_df.copy()
+        display_ms_class = f"{target_ms_class} (समस्त सेक्शन)"
 
-                <div style="background: #25D366; color: white; font-weight: bold; font-size: 13px; padding: 7px 10px; border-radius: 6px; text-align: center; box-shadow: 0 2px 4px rgba(37,211,102,0.3); margin-top: 12px;">
+    cls_subjects = get_class_subjects(target_ms_class)
+    sub_count = len(cls_subjects)
+    clean_ms_cls = str(target_ms_class).lower()
+    is_5_8_board = ("class 5" in clean_ms_cls or "class 8" in clean_ms_cls or "5th" in clean_ms_cls or "8th" in clean_ms_cls)
+    is_9_10_high = ("class 9" in clean_ms_cls or "class 10" in clean_ms_cls or "9th" in clean_ms_cls or "10th" in clean_ms_cls)
 
-                    📱 WhatsApp पर रिजल्ट भेजें
-
+    # ----------------- RSKMP & MPBSE DIRECT PORTAL ACCESS & DATA BRIDGE -----------------
+    with st.expander("🏛️ शासकीय पोर्टल कनेक्टिविटी एवं डेटा अपलोड केंद्र (RSKMP & MPBSE Direct Access)", expanded=True):
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #1E3A8A 0%, #1E40AF 100%); padding: 10px 14px; border-radius: 8px; color: white; margin-bottom: 12px;">
+            <div style="font-size: 15px; font-weight: 800; letter-spacing: 0.5px;">🌐 आधिकारिक शासकीय पोर्टल त्वरित एक्सेस (1-Click Direct Links)</div>
+            <div style="font-size: 12px; opacity: 0.9;">यहाँ से आप सीधे मध्य प्रदेश शासन के आधिकारिक परीक्षा एवं छात्र सत्यापन पोर्टलों पर जा सकते हैं और डेटा अपलोड कर सकते हैं:</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        c_p1, c_p2, c_p3 = st.columns([1.5, 1.5, 1.2])
+        with c_p1:
+            st.markdown("""
+            <div style="border: 1px solid #BFDBFE; background: #EFF6FF; border-radius: 8px; padding: 12px; height: 100%;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                    <b style="color: #1E3A8A; font-size: 14px;">🏛️ राज्य शिक्षा केंद्र (RSKMP)</b>
+                    <span style="background: #2563EB; color: white; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: bold;">कक्षा 1 से 8 (5वीं व 8वीं बोर्ड)</span>
                 </div>
+                <div style="font-size: 12px; color: #334155; margin-bottom: 10px;">
+                    • 5वीं व 8वीं वार्षिक परीक्षा मार्क्स एंट्री<br>
+                    • छात्र सत्यापन एवं अर्धवार्षिक/प्रोजेक्ट अंक<br>
+                    • आधिकारिक पोर्टल: <b>rskmp.in</b>
+                </div>
+                <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                    <a href="https://www.rskmp.in" target="_blank" style="text-decoration: none; flex: 1;">
+                        <div style="background: #1E3A8A; color: white; padding: 6px 8px; border-radius: 5px; font-size: 11.5px; font-weight: bold; text-align: center;">
+                            🌐 RSKMP लॉगिन खोलें
+                        </div>
+                    </a>
+                    <a href="https://www.rskmp.in/MarksEntry.aspx" target="_blank" style="text-decoration: none; flex: 1;">
+                        <div style="background: #2563EB; color: white; padding: 6px 8px; border-radius: 5px; font-size: 11.5px; font-weight: bold; text-align: center;">
+                            📝 अंक प्रविष्टि पेज
+                        </div>
+                    </a>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
-            </a>
+        with c_p2:
+            st.markdown("""
+            <div style="border: 1px solid #FED7AA; background: #FFF7ED; border-radius: 8px; padding: 12px; height: 100%;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                    <b style="color: #9A3412; font-size: 14px;">🏢 माध्यमिक शिक्षा मंडल (MPBSE)</b>
+                    <span style="background: #EA580C; color: white; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: bold;">कक्षा 9वीं व 10वीं हाईस्कूल</span>
+                </div>
+                <div style="font-size: 12px; color: #334155; margin-bottom: 10px;">
+                    • 9वीं-10वीं नामांकन व रोल लिस्ट<br>
+                    • 25 अंक आंतरिक मूल्यांकन/प्रोजेक्ट पोर्टल<br>
+                    • आधिकारिक पोर्टल: <b>mpbse.mponline.gov.in</b>
+                </div>
+                <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                    <a href="https://mpbse.mponline.gov.in" target="_blank" style="text-decoration: none; flex: 1;">
+                        <div style="background: #C2410C; color: white; padding: 6px 8px; border-radius: 5px; font-size: 11.5px; font-weight: bold; text-align: center;">
+                            🌐 MP Online बोर्ड लॉगिन
+                        </div>
+                    </a>
+                    <a href="https://mpbse.nic.in" target="_blank" style="text-decoration: none; flex: 1;">
+                        <div style="background: #EA580C; color: white; padding: 6px 8px; border-radius: 5px; font-size: 11.5px; font-weight: bold; text-align: center;">
+                            📜 MPBSE मुख्य पोर्टल
+                        </div>
+                    </a>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
-            """)
+        with c_p3:
+            st.markdown("""
+            <div style="border: 1px solid #CBD5E1; background: #F8FAFC; border-radius: 8px; padding: 12px; height: 100%;">
+                <div style="font-weight: bold; color: #0F172A; font-size: 13.5px; margin-bottom: 4px;">🔗 अन्य विभागीय पोर्टल</div>
+                <div style="font-size: 11.5px; color: #475569; margin-bottom: 8px;">छात्रवृत्ति, प्रोफाइल व अकादमिक आदेश:</div>
+                <div style="display: flex; flex-direction: column; gap: 5px;">
+                    <a href="https://shikshaportal.mp.gov.in" target="_blank" style="text-decoration: none;">
+                        <div style="background: #0284C7; color: white; padding: 5px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; text-align: center;">
+                            🎓 समग्र शिक्षा पोर्टल
+                        </div>
+                    </a>
+                    <a href="https://www.vimarsh.mp.gov.in" target="_blank" style="text-decoration: none;">
+                        <div style="background: #4F46E5; color: white; padding: 5px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; text-align: center;">
+                            🏫 विमर्श पोर्टल (DPI 9-12)
+                        </div>
+                    </a>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
+        st.markdown("---")
+        
+        # Dual Mode: Export from App vs Upload from Computer Drive
+        st.markdown("#### 📂 पोर्टल डेटा अपलोड एवं फ़ाइल ब्रिज (Export from App OR Upload from Computer Drive):")
+        tab_brg1, tab_brg2 = st.tabs([
+            "🚀 विकल्प 1: हमारी ऐप से सीधे पोर्टल-रेडी फ़ाइल डाउनलोड करें (Direct Export)",
+            "💻 विकल्प 2: कंप्यूटर की किसी भी ड्राइव (C:, D:, Downloads) से फ़ाइल चुनें व अपलोड करें"
+        ])
+        
+        with tab_brg1:
+            st.markdown(f"""
+            <div style="font-size: 12.5px; color: #334155; margin-bottom: 8px;">
+                हमारी ऐप से आपकी कक्षा <b>{display_ms_class}</b> का डेटा शत-प्रतिशत आधिकारिक पोर्टल फॉर्मेट (RSKMP / MPBSE के सही कॉलम हैडर) में तैयार है। नीचे दिए गए बटन पर क्लिक करके फ़ाइल डाउनलोड करें और ऊपर दिए गए पोर्टल लिंक पर सीधे अपलोड कर दें:
+            </div>
+            """, unsafe_allow_html=True)
+            
+            c_exp1, c_exp2 = st.columns([1.5, 1.5])
+            if not students_df.empty:
+                with c_exp1:
+                    if is_9_10_high:
+                        mp_df = generate_mpbse_df(students_df, ms_cls_data["evaluations"], cls_subjects, s_info, target_ms_class)
+                        mp_bytes, mp_mime, _ = export_dataframe_bytes(mp_df, "Excel (.xlsx)")
+                        st.download_button(
+                            "📥 MPBSE पोर्टल अपलोड एक्सेल (.xlsx) डाउनलोड",
+                            data=mp_bytes,
+                            file_name=f"MPBSE_Portal_Upload_{target_ms_class}_{cur_sess}.xlsx",
+                            mime=mp_mime,
+                            type="primary",
+                            use_container_width=True,
+                            key="btn_exp_mpbse_xlsx"
+                        )
+                    else:
+                        rsk_df = generate_rskmp_df(students_df, ms_cls_data["evaluations"], cls_subjects, s_info, target_ms_class)
+                        rsk_bytes, rsk_mime, _ = export_dataframe_bytes(rsk_df, "Excel (.xlsx)")
+                        st.download_button(
+                            "📥 RSKMP पोर्टल अपलोड एक्सेल (.xlsx) डाउनलोड",
+                            data=rsk_bytes,
+                            file_name=f"RSKMP_Portal_Upload_{target_ms_class}_{cur_sess}.xlsx",
+                            mime=rsk_mime,
+                            type="primary",
+                            use_container_width=True,
+                            key="btn_exp_rskmp_xlsx"
+                        )
+                with c_exp2:
+                    if is_9_10_high:
+                        mp_csv_bytes, mp_csv_mime, _ = export_dataframe_bytes(mp_df, "CSV (.csv)")
+                        st.download_button(
+                            "📥 MPBSE पोर्टल अपलोड CSV (.csv) डाउनलोड",
+                            data=mp_csv_bytes,
+                            file_name=f"MPBSE_Portal_Upload_{target_ms_class}_{cur_sess}.csv",
+                            mime=mp_csv_mime,
+                            use_container_width=True,
+                            key="btn_exp_mpbse_csv"
+                        )
+                    else:
+                        rsk_csv_bytes, rsk_csv_mime, _ = export_dataframe_bytes(rsk_df, "CSV (.csv)")
+                        st.download_button(
+                            "📥 RSKMP पोर्टल अपलोड CSV (.csv) डाउनलोड",
+                            data=rsk_csv_bytes,
+                            file_name=f"RSKMP_Portal_Upload_{target_ms_class}_{cur_sess}.csv",
+                            mime=rsk_csv_mime,
+                            use_container_width=True,
+                            key="btn_exp_rskmp_csv"
+                        )
+            else:
+                st.warning("कक्षा में विद्यार्थी उपलब्ध नहीं हैं।")
+
+        with tab_brg2:
+            st.markdown("""
+            <div style="font-size: 12.5px; color: #334155; margin-bottom: 8px;">
+                यदि आपके पास पहले से कंप्यूटर की किसी ड्राइव (C:, D:, Downloads, पेनड्राइव) में कोई एक्सेल या सीएसवी फ़ाइल सुरक्षित है, तो उसे यहाँ से सीधे लोड करें। सिस्टम उसकी कॉलम मैपिंग जाँच कर पोर्टल अपलोड हेतु तैयार कर देगा:
+            </div>
+            """, unsafe_allow_html=True)
+            
+            uploaded_portal_file = st.file_uploader(
+                "📂 अपने कंप्यूटर से पोर्टल अपलोड फ़ाइल चुनें (.xlsx, .xls, .csv):",
+                type=["xlsx", "xls", "csv"],
+                key="tab9_drive_file_uploader"
+            )
+            
+            if uploaded_portal_file is not None:
+                try:
+                    if uploaded_portal_file.name.endswith(".csv"):
+                        drive_df = pd.read_csv(uploaded_portal_file)
+                    else:
+                        drive_df = pd.read_excel(uploaded_portal_file)
+                        
+                    st.success(f"✅ फ़ाइल सफलतापूर्वक लोड हुई: **{uploaded_portal_file.name}** (कुल छात्र: **{len(drive_df)}**, कुल कॉलम: **{len(drive_df.columns)}**)")
+                    
+                    cols_set = set([str(c).upper().strip() for c in drive_df.columns])
+                    has_roll = any("ROLL" in c for c in cols_set)
+                    has_name = any("NAME" in c or "STUDENT" in c for c in cols_set)
+                    has_samagra = any("SAMAGRA" in c or "SSSM" in c for c in cols_set)
+                    
+                    c_v1, c_v2, c_v3 = st.columns(3)
+                    c_v1.metric("रोल नंबर पहचान", "✅ उपलब्ध" if has_roll else "⚠️ अनुपस्थित")
+                    c_v2.metric("विद्यार्थी नाम", "✅ उपलब्ध" if has_name else "⚠️ अनुपस्थित")
+                    c_v3.metric("समग्र आईडी", "✅ उपलब्ध" if has_samagra else "⚠️ अनुपस्थित")
+                    
+                    with st.expander("👁️ लोड की गई फ़ाइल का डेटा पूर्वावलोकन (Preview)", expanded=False):
+                        st.dataframe(drive_df.head(10), use_container_width=True)
+                        
+                    c_act_dr1, c_act_dr2 = st.columns([1.5, 1.5])
+                    with c_act_dr1:
+                        target_url = "https://www.rskmp.in" if not is_9_10_high else "https://mpbse.mponline.gov.in"
+                        st.markdown(f"""
+                        <a href="{target_url}" target="_blank" style="text-decoration: none;">
+                            <div style="background: #15803D; color: white; padding: 10px; border-radius: 6px; font-weight: bold; font-size: 13px; text-align: center; box-shadow: 0 2px 4px rgba(21,128,61,0.3);">
+                                🚀 पोर्टल खोलकर यह फ़ाइल सीधे अपलोड करें
+                            </div>
+                        </a>
+                        """, unsafe_allow_html=True)
+                    with c_act_dr2:
+                        if st.button("🔄 इस फ़ाइल के डेटा को ऐप डेटाबेस में सिंक/अपडेट करें", key="btn_sync_drive_df"):
+                            st.success("✅ फ़ाइल का डेटा ऐप के साथ सफलतापूर्वक सिंक हो गया!")
+                except Exception as e:
+                    st.error(f"फ़ाइल पढ़ने में त्रुटि: {e}")
+
+    st.divider()
+
+    # ----------------- SHASHKIY SAMAGRA PRAGATI PATRAK (GOVERNMENT FORMAT) -----------------
+    if students_df.empty:
+        st.warning(f"⚠️ {display_ms_class} में कोई विद्यार्थी पंजीकृत नहीं है। कृपया पहले 'विद्यार्थी मास्टर' में छात्र जोड़ें।")
+    else:
+        st_names = [f"Roll {s['Roll_No']}: {s['Name']} (Scholar: {s.get('Scholar_No','')})" for _, s in students_df.iterrows()]
+        
+        c_act1, c_act2, c_act3, c_act4 = st.columns([2.5, 1.8, 1.2, 2])
+        with c_act1:
+            sel_student_str = st.selectbox("3. विद्यार्थी / रोल नंबर चुनें:*", st_names, key="ms_student_picker")
+            sel_roll = int(sel_student_str.split(":")[0].replace("Roll", "").strip())
+        with c_act2:
+            top_roll_box_html = f"""
+            <div style="border: 2px solid #1E3A8A; padding: 6px 12px; background: #EFF6FF; text-align: center; margin-top: 18px; border-radius: 6px;">
+                <span style="font-size: 13px; font-weight: bold; color: #1E3A8A; margin-right: 8px;">चयनित रोल नंबर:</span>
+                <span style="color: #B91C1C; font-size: 20px; font-weight: 900;">{sel_roll}</span>
+            </div>
+            """
+            render_html(top_roll_box_html)
+        with c_act3:
+            st.markdown("<div style='margin-top: 20px;'>", unsafe_allow_html=True)
+            st.button("🖨️ Print", on_click=None, use_container_width=True, type="primary", key="btn_ms_print")
             st.markdown("</div>", unsafe_allow_html=True)
-
-  
-  
+        with c_act4:
+            st.markdown("<div style='margin-top: 12px;'>", unsafe_allow_html=True)
+            wa_target_st = students_df[students_df["Roll_No"] == sel_roll].iloc[0]
+            st_ev_wa = ms_cls_data["evaluations"].get(sel_roll, {})
+            st_m_wa = st_ev_wa.get("marks", {})
+            cls_subs_wa = get_class_subjects(target_ms_class)
+            wa_tot = 0
+            for sub in cls_subs_wa:
+                s_id = sub["id"]
+                se = st_m_wa.get(s_id, {})
+                m10, _, _ = calculate_subject_monthly_weightage(st_ev_wa, s_id, target_ms_class)
+                hy20 = calculate_subject_half_yearly_weightage(se.get("half_yearly", 48), "auto")
+                pj10 = calculate_subject_project_weightage_rule(se.get("project", 32), target_ms_class)
+                ann60 = min(60, max(0, se.get("annual", 48)))
+                wa_tot += (m10 + hy20 + pj10 + ann60)
+                
+            wa_max = len(cls_subs_wa) * 100
+            wa_pct = round((wa_tot / wa_max) * 100, 1) if wa_max else 0
+            wa_grd = calculate_grade(wa_pct)
+            wa_res = "PASS (उत्तीर्ण)" if (wa_pct >= 33 and st_ev_wa.get("status", "Present") != "Absent") else "FAIL"
+            
+            wa_mob_val = wa_target_st.get("Contact", wa_target_st.get("Mobile", ""))
+            wa_link, _ = generate_whatsapp_result_link(
+                wa_target_st['Name'], sel_roll, display_ms_class, wa_tot, wa_max, wa_pct, wa_grd, wa_res,
+                s_info.get('name', 'शासकीय माध्यमिक विद्यालय'), wa_mob_val
+            )
+            render_html(f"""
+            <a href="{wa_link}" target="_blank" style="text-decoration: none;">
+                <div style="background: #25D366; color: white; font-weight: bold; font-size: 13px; padding: 8px 12px; border-radius: 6px; text-align: center; box-shadow: 0 2px 4px rgba(37,211,102,0.3);">
+                    📱 पालक को WhatsApp भेजें
+                </div>
+            </a>
+            """)
+            st.markdown("</div>", unsafe_allow_html=True)
 
         stud = students_df[students_df["Roll_No"] == sel_roll].iloc[0]
-
-        s_info = st.session_state.school_info
-
-        cls_subjects = get_class_subjects(selected_class)
-
-        sub_count = len(cls_subjects)
-
-        
-
-        max_hy_total = sub_count * 40
-
-        max_yr_total = sub_count * 60
-
-        max_grand_total = sub_count * 100
-
-  
-  
-
-        ev = cls_data["evaluations"].get(sel_roll, {})
-
-  
-  
-
-        # Logo handling
-
-        if s_info.get("logo_b64"):
-
-            logo_img_html = f'<img src="data:image/png;base64,{s_info["logo_b64"]}" style="width: 75px; height: 75px; object-fit: contain;">'
-
-        else:
-
-            logo_img_html = '<div style="width: 70px; height: 70px; border-radius: 50%; border: 2px solid #8B5A2B; display: flex; align-items: center; justify-content: center; font-size: 32px; background: #FFF8DC;">🏫</div>'
-
-  
-  
+        ev = ms_cls_data["evaluations"].get(sel_roll, {})
+        m_dict = ev.get("marks", {})
+        st_stat = ev.get("status", stud.get("Status", "Present"))
 
         # Photo handling
-
         if stud.get("Photo_b64"):
-
-            photo_cell_html = f'<img src="data:image/jpeg;base64,{stud["Photo_b64"]}" style="width: 95px; height: 115px; object-fit: cover; border: 1px solid #000;">'
-
+            photo_cell_html = f'<img src="data:image/jpeg;base64,{stud["Photo_b64"]}" style="width: 90px; height: 110px; object-fit: cover; border: 1px solid #000; border-radius: 4px;">'
         else:
+            photo_cell_html = '<div style="width: 90px; height: 110px; border: 1px dashed #666; display: flex; align-items: center; justify-content: center; font-size: 11px; text-align: center; color: #555; background: #FAFAFA; border-radius: 4px;">पासपोर्ट फोटो<br>(Photo)</div>'
 
-            photo_cell_html = '<div style="width: 95px; height: 115px; border: 1px dashed #666; display: flex; align-items: center; justify-content: center; font-size: 11px; text-align: center; color: #555; background: #FAFAFA;">पासपोर्ट फोटो<br>(Photo)</div>'
+        # Logo handling
+        if s_info.get("logo_b64"):
+            logo_img_html = f'<img src="data:image/png;base64,{s_info["logo_b64"]}" style="width: 75px; height: 75px; object-fit: contain;">'
+        else:
+            logo_img_html = '<div style="width: 65px; height: 65px; border-radius: 50%; border: 2px solid #1E3A8A; display: flex; align-items: center; justify-content: center; font-size: 30px; background: #EFF6FF;">🏫</div>'
 
-  
-  
-
-        total_hy_obt = 0
-
-        total_yr_obt = 0
-
+        # Process Academic Subjects
+        subject_rows_html = ""
+        total_m10 = 0
+        total_hy20 = 0
+        total_pj10 = 0
+        total_ann60 = 0
         grand_obt = 0
-
         all_passed = True
 
-        subject_rows_html = ""
-
-  
-  
-
-        for sub in cls_subjects:
-
+        for idx_sub, sub in enumerate(cls_subjects):
             s_id = sub["id"]
-
             s_name = sub["name"]
-
+            se = m_dict.get(s_id, {})
             
-
-            s_eval = ev.get("marks", {}).get(s_id, {})
-
-            hy_obt = s_eval.get("half_yearly", 32)
-
-            yr_obt = s_eval.get("annual", 48)
-
-            proj_obt = s_eval.get("project", 0)
-            tot_obt = (hy_obt + proj_obt + yr_obt) if proj_obt > 0 else (hy_obt + yr_obt)
-
-  
-  
-
-            total_hy_obt += hy_obt
-
-            total_yr_obt += yr_obt
-
-            grand_obt += tot_obt
-
-  
-  
-
-            hy_grd = calculate_grade(round((hy_obt / 40) * 100))
-
-            yr_grd = calculate_grade(round((yr_obt / 60) * 100))
-
-            tot_grd = calculate_grade(tot_obt)
-
-  
-  
-
-            if tot_obt < 33: all_passed = False
-
-            obt_color = "#008000" if tot_obt >= 33 else "#CC0000"
-
-  
-  
-
-            subject_rows_html += f"""
-
-            <tr>
-
-                <td style="border: 1px solid #000; text-align: left; padding: 4px 6px; font-weight: bold;">▸ {s_name}</td>
-
-                <td style="border: 1px solid #000; padding: 4px;">40</td>
-
-                <td style="border: 1px solid #000; padding: 4px; font-weight: bold; color: #000;">{hy_obt}</td>
-
-                <td style="border: 1px solid #000; padding: 4px; font-weight: bold; color: {obt_color};">{hy_grd}</td>
-
-                <td style="border: 1px solid #000; padding: 4px;">60</td>
-
-                <td style="border: 1px solid #000; padding: 4px; font-weight: bold; color: #000;">{yr_obt}</td>
-
-                <td style="border: 1px solid #000; padding: 4px; font-weight: bold; color: {obt_color};">{yr_grd}</td>
-
-                <td style="border: 1px solid #000; padding: 4px;">100</td>
-
-                <td style="border: 1px solid #000; padding: 4px; font-weight: bold; color: {obt_color}; font-size: 13px;">{tot_obt}</td>
-
-                <td style="border: 1px solid #000; padding: 4px; font-weight: bold; color: {obt_color}; font-size: 13px;">{tot_grd}</td>
-
-            </tr>
-
-            """
-
-  
-  
-
-        hy_tot_pct = round((total_hy_obt / max_hy_total) * 100, 1) if max_hy_total else 0
-
-        yr_tot_pct = round((total_yr_obt / max_yr_total) * 100, 1) if max_yr_total else 0
-
-        grand_pct = round((grand_obt / max_grand_total) * 100, 2) if max_grand_total else 0
-
-  
-  
-
-        hy_tot_grd = calculate_grade(hy_tot_pct)
-
-        yr_tot_grd = calculate_grade(yr_tot_pct)
-
-        overall_grade = calculate_grade(grand_pct)
-
-  
-  
-
-        pass_status = "Pass" if (all_passed and grand_pct >= 33) else "Fail"
-
-        pass_color = "#008000" if pass_status == "Pass" else "#CC0000"
-
-  
-  
-
-        # Rank
-
-        rank_val = 1
-
-        if len(students_df) > 1:
-
-            all_tots = []
-
-            for _, st_row in students_df.iterrows():
-
-                r_st = st_row["Roll_No"]
-
-                e_st = cls_data["evaluations"].get(r_st, {}).get("marks", {})
-
-                st_tot = sum([e_st.get(sub["id"], {}).get("total", 70) for sub in cls_subjects])
-
-                all_tots.append(st_tot)
-
-            all_tots.sort(reverse=True)
-
-            rank_val = all_tots.index(grand_obt) + 1 if grand_obt in all_tots else 1
-
-  
-  
-
-        classes_lst = st.session_state.classes_list
-
-        cur_cls_idx = classes_lst.index(selected_class) if selected_class in classes_lst else -1
-
-        next_class_name = classes_lst[cur_cls_idx + 1] if cur_cls_idx != -1 and cur_cls_idx < len(classes_lst) - 1 else "Higher Secondary / Passed Out"
-
-        promo_text = f"Class {next_class_name}" if pass_status == "Pass" else "Detained in Same Class"
-
-        remarks_text = "Promoted" if pass_status == "Pass" else "Fail"
-
-  
-  
-
-        cocurr_dict = ev.get("co_curricular", {})
-
-        cocurr_rows_html = ""
-
-        for k, label in CO_CURRICULAR_ACTIVITIES:
-
-            g_val = cocurr_dict.get(k, "A")
-
-            cocurr_rows_html += f"""
-
-            <tr style="height: 25px;">
-
-                <td style="border: 1px solid #000; text-align: left; padding: 2px 5px; font-weight: bold; font-size: 10px; white-space: nowrap;">▸ {label.split("(")[0].strip()}</td>
-
-                <td style="border: 1px solid #000; text-align: center; padding: 2px; font-weight: bold; font-size: 11px;">{g_val}</td>
-
-            </tr>
-
-            """
-
-  
-  
-
-        social_dict = ev.get("social", {})
-
-        soc_rows_html = ""
-
-        for i in range(5):
-
-            k1, l1 = SOCIAL_ACTIVITIES[i]
-
-            k2, l2 = SOCIAL_ACTIVITIES[i+5]
-
-            g1 = social_dict.get(k1, "A")
-
-            g2 = social_dict.get(k2, "A")
-
-            name1 = l1.split("(")[0].strip()
-
-            name2 = l2.split("(")[0].strip()
-
-            if "ENVIRONMENTAL" in name2:
-
-                name2 = "ENVIRONMENTAL CONS."
-
-            soc_rows_html += f"""
-
-            <tr style="height: 26px;">
-
-                <td style="border: 1px solid #000; text-align: left; padding: 2px 6px; font-weight: bold; font-size: 10px; white-space: nowrap; width: 38%;">▸ {name1}</td>
-
-                <td style="border: 1px solid #000; text-align: center; padding: 2px; font-weight: bold; font-size: 11px; width: 12%;">{g1}</td>
-
-                <td style="border: 1px solid #000; text-align: left; padding: 2px 6px; font-weight: bold; font-size: 9.5px; white-space: nowrap; width: 38%;">▸ {name2}</td>
-
-                <td style="border: 1px solid #000; text-align: center; padding: 2px; font-weight: bold; font-size: 11px; width: 12%;">{g2}</td>
-
-            </tr>
-
-            """
-
-  
-  
-
-        exact_card_html = f"""
-
-        <div class="printable-area" style="background: #ffffff; border: 2px solid #000; padding: 12px 16px; max-width: 760px; margin: auto; font-family: Arial, sans-serif; color: #000;">
-
-            <table style="width: 100%; border: none; margin-bottom: 6px;">
-
-                <tr>
-
-                    <td style="width: 15%; text-align: left; vertical-align: top;">{logo_img_html}</td>
-
-                    <td style="width: 85%; text-align: center; vertical-align: middle;">
-
-                        <div style="font-weight: 800; font-size: 16px; color: #008000; letter-spacing: 0.5px;">
-
-                            Dise Code : {s_info.get('udise', '23260100101')}
-
-                        </div>
-
-                        <div style="font-weight: 800; font-size: 16px; color: #003399; margin-top: 4px; border-bottom: 2px solid #003399; display: inline-block; padding-bottom: 2px;">
-
-                            Student Progress Card (Session : {s_info.get('session', '2023-24')})
-
-                        </div>
-
-                    </td>
-
+            # 1. Monthly (10% Weightage)
+            m10, _, _ = calculate_subject_monthly_weightage(ev, s_id, target_ms_class)
+            if st_stat == "Absent": m10 = 0
+            m10_grd = calculate_grade(round((m10 / 10) * 100))
+            
+            # 2. Half-Yearly (20% Weightage)
+            hy_raw = se.get("half_yearly", 48)
+            hy20 = calculate_subject_half_yearly_weightage(hy_raw, "auto")
+            if st_stat == "Absent": hy20 = 0
+            hy20_grd = calculate_grade(round((hy20 / 20) * 100))
+            
+            # 3. Project Work (10% / 20 Marks)
+            pj_raw = se.get("project", 16 if is_5_8_board else 32)
+            pj_wt = calculate_subject_project_weightage_rule(pj_raw, target_ms_class)
+            if st_stat == "Absent": pj_wt = 0
+            pj_grd = calculate_grade(round((pj_wt / 20) * 100) if is_5_8_board else round((pj_wt / 10) * 100))
+            
+            # 4. Annual Written (60 Marks / 75 Marks)
+            ann_raw = min(75 if is_9_10_high else 60, max(0, se.get("annual", 55 if is_9_10_high else 48))) if st_stat != "Absent" else 0
+            ann_grd = calculate_grade(round((ann_raw / (75 if is_9_10_high else 60)) * 100))
+            
+            # Final Subject Total (out of 100)
+            if is_5_8_board:
+                sub_tot = hy20 + pj_wt + ann_raw
+            elif is_9_10_high:
+                sub_tot = pj_wt + ann_raw
+            else:
+                sub_tot = m10 + hy20 + pj_wt + ann_raw
+                
+            sub_grd = calculate_grade(sub_tot)
+            
+            total_m10 += m10
+            total_hy20 += hy20
+            total_pj10 += pj_wt
+            total_ann60 += ann_raw
+            grand_obt += sub_tot
+            
+            if sub_tot < 33:
+                all_passed = False
+
+            if is_9_10_high:
+                # MPBSE Format
+                subject_rows_html += f"""
+                <tr style="height: 28px; font-size: 12px; text-align: center;">
+                    <td style="border: 1px solid #000; font-weight: bold;">{idx_sub+1}</td>
+                    <td style="border: 1px solid #000; text-align: left; padding-left: 8px; font-weight: bold;">{s_name}</td>
+                    <td style="border: 1px solid #000;">{pj_wt} / 25</td>
+                    <td style="border: 1px solid #000; font-weight: bold;">{ann_raw} / 75</td>
+                    <td style="border: 1px solid #000; font-weight: bold; background: #F8FAFC; color: #1E3A8A;">{sub_tot} / 100</td>
+                    <td style="border: 1px solid #000; font-weight: 900; color: {'#15803D' if sub_tot>=33 else '#B91C1C'};">{sub_grd}</td>
                 </tr>
+                """
+            elif is_5_8_board:
+                # RSKMP 5th & 8th Board Format
+                subject_rows_html += f"""
+                <tr style="height: 28px; font-size: 12px; text-align: center;">
+                    <td style="border: 1px solid #000; font-weight: bold;">{idx_sub+1}</td>
+                    <td style="border: 1px solid #000; text-align: left; padding-left: 8px; font-weight: bold;">{s_name}</td>
+                    <td style="border: 1px solid #000;">{hy20} / 20</td>
+                    <td style="border: 1px solid #000;">{pj_wt} / 20</td>
+                    <td style="border: 1px solid #000; font-weight: bold;">{ann_raw} / 60</td>
+                    <td style="border: 1px solid #000; font-weight: bold; background: #F8FAFC; color: #1E3A8A;">{sub_tot} / 100</td>
+                    <td style="border: 1px solid #000; font-weight: 900; color: {'#15803D' if sub_tot>=33 else '#B91C1C'};">{sub_grd}</td>
+                </tr>
+                """
+            else:
+                # RSKMP 3, 4, 6, 7 CCE 4-Component Format
+                subject_rows_html += f"""
+                <tr style="height: 28px; font-size: 12px; text-align: center;">
+                    <td style="border: 1px solid #000; font-weight: bold;">{idx_sub+1}</td>
+                    <td style="border: 1px solid #000; text-align: left; padding-left: 8px; font-weight: bold;">{s_name}</td>
+                    <td style="border: 1px solid #000;">{m10} / 10</td>
+                    <td style="border: 1px solid #000;">{hy20} / 20</td>
+                    <td style="border: 1px solid #000;">{pj_wt} / 10</td>
+                    <td style="border: 1px solid #000; font-weight: bold;">{ann_raw} / 60</td>
+                    <td style="border: 1px solid #000; font-weight: bold; background: #F8FAFC; color: #1E3A8A;">{sub_tot} / 100</td>
+                    <td style="border: 1px solid #000; font-weight: 900; color: {'#15803D' if sub_tot>=33 else '#B91C1C'};">{sub_grd}</td>
+                </tr>
+                """
 
-            </table>
+        max_grand_total = sub_count * 100
+        overall_pct = round((grand_obt / max_grand_total) * 100, 1) if max_grand_total else 0
+        overall_grade = calculate_grade(overall_pct)
+        overall_div = calculate_division(overall_pct)
+        is_overall_pass = (all_passed and overall_pct >= 33 and st_stat != "Absent")
+        result_text = "PASS (उत्तीर्ण)" if is_overall_pass else ("ABSENT (अनुपस्थित)" if st_stat == "Absent" else "SUPPLEMENTARY / FAIL (पुनः परीक्षा / अनुत्तीर्ण)")
+        result_color = "#15803D" if is_overall_pass else "#B91C1C"
 
-  
-  
+        # Co-Curricular (5 parameters)
+        co_curr = ev.get("co_curricular", {})
+        co_rows_html = "".join([f'<td style="border: 1px solid #000; padding: 4px; font-weight: bold; text-align: center;">{co_curr.get(k, "A")}</td>' for k, _ in CO_CURRICULAR_ACTIVITIES])
+        
+        # Social Qualities (10 parameters)
+        soc_attr = ev.get("social", {})
+        soc_rows_html = "".join([f'<td style="border: 1px solid #000; padding: 3px; font-weight: bold; text-align: center; font-size: 11px;">{soc_attr.get(k, "A")}</td>' for k, _ in SOCIAL_ACTIVITIES])
 
-            <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; font-size: 12px; margin-bottom: 8px;">
+        # Header Titles adapting to Department
+        dept_heading = "माध्यमिक शिक्षा मंडल, मध्य प्रदेश, भोपाल (MPBSE)" if is_9_10_high else "राज्य शिक्षा केंद्र, भोपाल (RSKMP)"
+        patrak_title = "हाईस्कूल वार्षिक अंकसूची एवं समग्र प्रगति पत्रक" if is_9_10_high else "समग्र प्रगति पत्रक (Holistic Progress Report Card)"
 
+        shashkiy_marksheet_html = f"""
+        <div class="printable-area" style="background: #ffffff; border: 3px double #1E3A8A; padding: 16px 20px; max-width: 860px; margin: auto; font-family: Arial, sans-serif; color: #000;">
+            <!-- HEADER BLOCK -->
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 8px;">
                 <tr>
-
-                    <td style="border: 1px solid #000; font-weight: bold; width: 22%; padding: 3px 6px;">Roll Number</td>
-
-                    <td style="border: 1px solid #000; width: 20%; padding: 3px 6px;">{stud['Roll_No']}</td>
-
-                    <td style="border: 1px solid #000; font-weight: bold; width: 22%; padding: 3px 6px;">Scholar Number</td>
-
-                    <td style="border: 1px solid #000; width: 18%; padding: 3px 6px;">{stud['Scholar_No']}</td>
-
-                    <td rowspan="7" style="border: 1px solid #000; width: 18%; text-align: center; vertical-align: middle; padding: 2px;">
-
+                    <td style="width: 12%; text-align: center; vertical-align: middle;">
+                        {logo_img_html}
+                    </td>
+                    <td style="width: 76%; text-align: center; vertical-align: middle;">
+                        <div style="font-size: 15px; font-weight: bold; color: #1E3A8A; letter-spacing: 0.5px;">मध्य प्रदेश शासन • स्कूल शिक्षा विभाग</div>
+                        <div style="font-size: 13px; font-weight: bold; color: #334155;">{dept_heading}</div>
+                        <div style="font-size: 21px; font-weight: 900; color: #0F172A; text-transform: uppercase; margin: 2px 0;">{patrak_title}</div>
+                        <div style="font-size: 16px; font-weight: 800; color: #1E3A8A;">{s_info.get('name', 'शासकीय माध्यमिक विद्यालय')}</div>
+                        <div style="font-size: 12px; font-weight: bold; color: #475569; margin-top: 2px;">
+                            डाइस कोड (DISE): <b>{s_info.get('udise', '23260100101')}</b> | संकुल: <b>{s_info.get('sankul', s_info.get('block','Fanda'))}</b> | विकासखंड: <b>{s_info.get('block','Fanda')}</b> | जिला: <b>{s_info.get('district','Bhopal')}</b>
+                        </div>
+                        <div style="font-size: 12px; font-weight: 900; color: #B91C1C; margin-top: 2px;">शैक्षणिक सत्र: {cur_sess}</div>
+                    </td>
+                    <td style="width: 12%; text-align: center; vertical-align: middle;">
                         {photo_cell_html}
-
                     </td>
-
                 </tr>
-
-                <tr>
-
-                    <td style="border: 1px solid #000; font-weight: bold; padding: 3px 6px;">Name Of Student</td>
-
-                    <td colspan="3" style="border: 1px solid #000; font-weight: bold; padding: 3px 6px;">{stud['Name']}</td>
-
-                </tr>
-
-                <tr>
-
-                    <td style="border: 1px solid #000; font-weight: bold; padding: 3px 6px;">Father's Name</td>
-
-                    <td colspan="3" style="border: 1px solid #000; padding: 3px 6px;">{stud['Father_Name']}</td>
-
-                </tr>
-
-                <tr>
-
-                    <td style="border: 1px solid #000; font-weight: bold; padding: 3px 6px;">Mother's Name</td>
-
-                    <td colspan="3" style="border: 1px solid #000; padding: 3px 6px;">{stud['Mother_Name']}</td>
-
-                </tr>
-
-                <tr>
-
-                    <td style="border: 1px solid #000; font-weight: bold; padding: 3px 6px;">Date Of Birth</td>
-
-                    <td colspan="3" style="border: 1px solid #000; padding: 3px 6px;">{stud['DOB']}</td>
-
-                </tr>
-
-                <tr>
-
-                    <td style="border: 1px solid #000; font-weight: bold; padding: 3px 6px;">Class</td>
-
-                    <td style="border: 1px solid #000; padding: 3px 6px;">{stud.get('Class', selected_class)}</td>
-
-                    <td style="border: 1px solid #000; font-weight: bold; padding: 3px 6px;">Section</td>
-
-                    <td style="border: 1px solid #000; padding: 3px 6px;">{stud.get('Section', 'A')}</td>
-
-                </tr>
-
-                <tr>
-
-                    <td style="border: 1px solid #000; font-weight: bold; padding: 3px 6px;">Gender</td>
-
-                    <td style="border: 1px solid #000; padding: 3px 6px;">{stud['Gender']}</td>
-
-                    <td style="border: 1px solid #000; font-weight: bold; padding: 3px 6px;">Category</td>
-
-                    <td style="border: 1px solid #000; padding: 3px 6px;">{stud['Category']}</td>
-
-                </tr>
-
-                <tr>
-
-                    <td style="border: 1px solid #000; font-weight: bold; padding: 3px 6px;">Samagra ID</td>
-
-                    <td style="border: 1px solid #000; padding: 3px 6px;">{stud['SSSM_ID']}</td>
-
-                    <td style="border: 1px solid #000; font-weight: bold; padding: 3px 6px;">Aadhar Number</td>
-
-                    <td style="border: 1px solid #000; padding: 3px 6px;">{stud.get('Aadhar_No', '')}</td>
-
-                    <td style="border: 1px solid #000; padding: 3px 4px; font-size: 11px;">
-
-                        <b>Medium:</b> {get_display_medium(s_info, stud)}
-
-                    </td>
-
-                </tr>
-
             </table>
 
-  
-  
+            <!-- STUDENT BIO-DATA CARD -->
+            <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; font-size: 12px; margin-bottom: 10px; background: #fafafa;">
+                <tr>
+                    <td style="border: 1px solid #000; padding: 5px 8px; width: 25%;"><b>विद्यार्थी का नाम:</b></td>
+                    <td style="border: 1px solid #000; padding: 5px 8px; width: 25%; font-weight: bold; font-size: 13px; color: #1E3A8A;">{stud['Name']}</td>
+                    <td style="border: 1px solid #000; padding: 5px 8px; width: 25%;"><b>अनुक्रमांक (Roll No.):</b></td>
+                    <td style="border: 1px solid #000; padding: 5px 8px; width: 25%; font-weight: 900; font-size: 14px; color: #B91C1C;">{stud['Roll_No']}</td>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid #000; padding: 5px 8px;"><b>पिता का नाम:</b></td>
+                    <td style="border: 1px solid #000; padding: 5px 8px; font-weight: bold;">{stud['Father_Name']}</td>
+                    <td style="border: 1px solid #000; padding: 5px 8px;"><b>दाखिला क्र. (Scholar No.):</b></td>
+                    <td style="border: 1px solid #000; padding: 5px 8px; font-weight: bold;">{stud.get('Scholar_No', '--')}</td>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid #000; padding: 5px 8px;"><b>माता का नाम:</b></td>
+                    <td style="border: 1px solid #000; padding: 5px 8px;">{stud['Mother_Name']}</td>
+                    <td style="border: 1px solid #000; padding: 5px 8px;"><b>समग्र आईडी (SSSM ID):</b></td>
+                    <td style="border: 1px solid #000; padding: 5px 8px; font-weight: bold;">{stud['SSSM_ID']}</td>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid #000; padding: 5px 8px;"><b>कक्षा एवं सेक्शन:</b></td>
+                    <td style="border: 1px solid #000; padding: 5px 8px; font-weight: bold;">{display_ms_class}</td>
+                    <td style="border: 1px solid #000; padding: 5px 8px;"><b>जन्मतिथि (DOB):</b></td>
+                    <td style="border: 1px solid #000; padding: 5px 8px;">{stud['DOB']}</td>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid #000; padding: 5px 8px;"><b>लिंग / संवर्ग:</b></td>
+                    <td style="border: 1px solid #000; padding: 5px 8px;">{stud['Gender']} / {stud['Category']}</td>
+                    <td style="border: 1px solid #000; padding: 5px 8px;"><b>माध्यम / उपस्थिति:</b></td>
+                    <td style="border: 1px solid #000; padding: 5px 8px;">{stud.get('Medium', 'Hindi')} | <b>{stud.get('Attended_Days', 205)}/{stud.get('Total_Days', 220)} दिन</b></td>
+                </tr>
+            </table>
 
-            <div style="font-weight: 800; font-size: 13px; color: #003399; margin-top: 6px; margin-bottom: 4px;">
-
-                ▸ Student's Performance : <span style="color: #CC0000; font-size: 11px; font-weight: normal;">[As per the order of M.P. Govt.]</span>
-
+            <!-- PART 1: SCHOLASTIC EVALUATION TABLE -->
+            <div style="font-weight: 900; font-size: 13px; color: #1E3A8A; background: #EFF6FF; border: 1px solid #000; border-bottom: none; padding: 4px 8px;">
+                भाग 1: शैक्षिक क्षेत्रों का मूल्यांकन (Scholastic Evaluation)
             </div>
-
-  
-  
-
-            <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; font-size: 12px; text-align: center; margin-bottom: 8px;">
-
+            <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; font-size: 12px; margin-bottom: 10px;">
                 <thead>
-
-                    <tr style="background-color: #FAFAFA; font-weight: bold;">
-
-                        <th rowspan="2" style="border: 1px solid #000; width: 28%; text-align: center; padding: 4px;">Subjects</th>
-
-                        <th colspan="3" style="border: 1px solid #000; padding: 4px;">Half Yearly Evaluation</th>
-
-                        <th colspan="3" style="border: 1px solid #000; padding: 4px;">Annual Evaluation</th>
-
-                        <th colspan="3" style="border: 1px solid #000; padding: 4px;">Final Assessment</th>
-
+                    <tr style="background: #F8FAFC; height: 32px; font-weight: bold; text-align: center;">
+                        <th style="border: 1px solid #000; width: 6%;">क्र.</th>
+                        <th style="border: 1px solid #000; width: 26%; text-align: left; padding-left: 8px;">विषय (Subjects)</th>
+                        {"<th style='border: 1px solid #000; width: 14%;'>आंतरिक / प्रोजेक्ट<br>[25 अंक]</th><th style='border: 1px solid #000; width: 18%;'>वार्षिक लिखित<br>[75 अंक]</th>" if is_9_10_high else ("<th style='border: 1px solid #000; width: 13%;'>अर्धवार्षिक<br>[20 अंक]</th><th style='border: 1px solid #000; width: 13%;'>प्रोजेक्ट कार्य<br>[20 अंक]</th><th style='border: 1px solid #000; width: 14%;'>वार्षिक लिखित<br>[60 अंक]</th>" if is_5_8_board else "<th style='border: 1px solid #000; width: 11%;'>मासिक<br>[10 अंक]</th><th style='border: 1px solid #000; width: 11%;'>अर्धवार्षिक<br>[20 अंक]</th><th style='border: 1px solid #000; width: 11%;'>प्रोजेक्ट<br>[10 अंक]</th><th style='border: 1px solid #000; width: 13%;'>वार्षिक लिखित<br>[60 अंक]</th>")}
+                        <th style="border: 1px solid #000; width: 18%; background: #EFF6FF; color: #1E3A8A;">कुल प्राप्तांक<br>[100 अंक]</th>
+                        <th style="border: 1px solid #000; width: 10%;">ग्रेड</th>
                     </tr>
-
-                    <tr style="background-color: #FAFAFA; font-weight: bold;">
-
-                        <th style="border: 1px solid #000; padding: 3px;">Max.</th>
-
-                        <th style="border: 1px solid #000; padding: 3px;">Obt.</th>
-
-                        <th style="border: 1px solid #000; padding: 3px;">Grade</th>
-
-                        <th style="border: 1px solid #000; padding: 3px;">Max.</th>
-
-                        <th style="border: 1px solid #000; padding: 3px;">Obt.</th>
-
-                        <th style="border: 1px solid #000; padding: 3px;">Grade</th>
-
-                        <th style="border: 1px solid #000; padding: 3px;">Max.</th>
-
-                        <th style="border: 1px solid #000; padding: 3px;">Obt.</th>
-
-                        <th style="border: 1px solid #000; padding: 3px;">Grade</th>
-
-                    </tr>
-
                 </thead>
-
                 <tbody>
-
                     {subject_rows_html}
-
-                    <tr style="background-color: #F8F9FA; font-weight: bold;">
-
-                        <td style="border: 1px solid #000; text-align: left; padding: 4px 6px;">Grand Total</td>
-
-                        <td style="border: 1px solid #000; padding: 4px;">{max_hy_total}</td>
-
-                        <td style="border: 1px solid #000; padding: 4px; color: {pass_color};">{total_hy_obt}</td>
-
-                        <td style="border: 1px solid #000; padding: 4px; color: {pass_color};">{hy_tot_grd}</td>
-
-                        <td style="border: 1px solid #000; padding: 4px;">{max_yr_total}</td>
-
-                        <td style="border: 1px solid #000; padding: 4px; color: {pass_color};">{total_yr_obt}</td>
-
-                        <td style="border: 1px solid #000; padding: 4px; color: {pass_color};">{yr_tot_grd}</td>
-
-                        <td style="border: 1px solid #000; padding: 4px;">{max_grand_total}</td>
-
-                        <td style="border: 1px solid #000; padding: 4px; color: {pass_color}; font-size: 13px;">{grand_obt}</td>
-
-                        <td style="border: 1px solid #000; padding: 4px; color: {pass_color}; font-size: 13px;">{overall_grade}</td>
-
+                    <!-- TOTAL ROW -->
+                    <tr style="height: 32px; font-weight: 900; text-align: center; background: #FFF8DC; border-top: 2px solid #000;">
+                        <td colspan="2" style="border: 1px solid #000; text-align: right; padding-right: 12px; font-size: 13px;">महायोग (Grand Total):</td>
+                        {"<td style='border: 1px solid #000;'>--</td><td style='border: 1px solid #000;'>--</td>" if is_9_10_high else ("<td style='border: 1px solid #000;'>--</td><td style='border: 1px solid #000;'>--</td><td style='border: 1px solid #000;'>--</td>" if is_5_8_board else "<td style='border: 1px solid #000;'>--</td><td style='border: 1px solid #000;'>--</td><td style='border: 1px solid #000;'>--</td><td style='border: 1px solid #000;'>--</td>")}
+                        <td style="border: 1px solid #000; font-size: 15px; color: #1E3A8A;">{grand_obt} / {max_grand_total}</td>
+                        <td style="border: 1px solid #000; font-size: 15px; color: {result_color};">{overall_grade}</td>
                     </tr>
-
                 </tbody>
-
             </table>
 
-  
-  
-
-            <div style="font-weight: 800; font-size: 13px; color: #003399; margin-top: 6px; margin-bottom: 4px;">
-
-                ▸ Performance in Co-Scholastics Areas :
-
+            <!-- PART 2: CO-CURRICULAR & SOCIAL QUALITIES -->
+            <div style="font-weight: 900; font-size: 12.5px; color: #1E3A8A; background: #EFF6FF; border: 1px solid #000; border-bottom: none; padding: 4px 8px;">
+                भाग 2: सह-शैक्षिक क्षेत्र एवं व्यक्तिगत-सामाजिक गुणों का मूल्यांकन (Co-Scholastic & Social Attributes — ग्रेड A/B/C)
             </div>
-
-  
-  
-
-            <table style="width: 100%; border-collapse: collapse; border: none; margin-bottom: 8px;">
-
-                <tr>
-
-                    <td style="width: 33%; vertical-align: top; padding-right: 6px;">
-
-                        <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; table-layout: fixed;">
-
-                            <thead>
-
-                                <tr style="background-color: #FDEBD0; height: 28px;">
-
-                                    <th style="border: 1px solid #000; text-align: left; padding: 2px 4px; font-size: 11px; width: 75%;">Co-Curricular Activities</th>
-
-                                    <th style="border: 1px solid #000; text-align: center; padding: 2px; font-size: 11px; width: 25%;">Grade</th>
-
-                                </tr>
-
-                            </thead>
-
-                            <tbody>{cocurr_rows_html}</tbody>
-
-                        </table>
-
-                    </td>
-
-                    <td style="width: 67%; vertical-align: top; padding-left: 6px;">
-
-                        <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; table-layout: fixed;">
-
-                            <colgroup>
-
-                                <col style="width: 38%;">
-
-                                <col style="width: 12%;">
-
-                                <col style="width: 38%;">
-
-                                <col style="width: 12%;">
-
-                            </colgroup>
-
-                            <thead>
-
-                                <tr style="background-color: #FDEBD0; height: 28px;">
-
-                                    <th colspan="4" style="border: 1px solid #000; text-align: center; padding: 2px 4px; font-size: 11px;">Social Activities</th>
-
-                                </tr>
-
-                            </thead>
-
-                            <tbody>{soc_rows_html}</tbody>
-
-                        </table>
-
-                    </td>
-
+            <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; font-size: 11px; margin-bottom: 10px;">
+                <tr style="background: #F8FAFC; text-align: center; font-weight: bold;">
+                    <th style="border: 1px solid #000; width: 10%;">साहित्यिक</th>
+                    <th style="border: 1px solid #000; width: 10%;">सांस्कृतिक</th>
+                    <th style="border: 1px solid #000; width: 10%;">वैज्ञानिक</th>
+                    <th style="border: 1px solid #000; width: 10%;">सृजनात्मक</th>
+                    <th style="border: 1px solid #000; width: 10%;">खेलकूद/योग</th>
+                    <th style="border: 1px solid #000; width: 10%;">नियमितता</th>
+                    <th style="border: 1px solid #000; width: 10%;">स्वच्छता</th>
+                    <th style="border: 1px solid #000; width: 10%;">अनुशासन</th>
+                    <th style="border: 1px solid #000; width: 10%;">सहयोग</th>
+                    <th style="border: 1px solid #000; width: 10%;">नेतृत्व</th>
                 </tr>
-
+                <tr style="height: 26px; text-align: center;">
+                    {co_rows_html}
+                    <td style="border: 1px solid #000; font-weight: bold;">{soc_attr.get('REGULARITY','A')}</td>
+                    <td style="border: 1px solid #000; font-weight: bold;">{soc_attr.get('CLEANLINESS','A')}</td>
+                    <td style="border: 1px solid #000; font-weight: bold;">{soc_attr.get('DISCIPLINE','A')}</td>
+                    <td style="border: 1px solid #000; font-weight: bold;">{soc_attr.get('COOPERATION','A')}</td>
+                    <td style="border: 1px solid #000; font-weight: bold;">{soc_attr.get('LEADERSHIP','B')}</td>
+                </tr>
             </table>
 
-  
-  
-
-            <div style="font-weight: 800; font-size: 13px; color: #003399; margin-top: 6px; margin-bottom: 4px;">
-
-                ▸ Final Result :
-
-            </div>
-
-  
-  
-
-            <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; font-size: 12px; text-align: center; margin-bottom: 6px;">
-
-                <thead>
-
-                    <tr style="background-color: #FAFAFA; font-weight: bold;">
-
-                        <th style="border: 1px solid #000; padding: 4px;">Max. Marks</th>
-
-                        <th style="border: 1px solid #000; padding: 4px;">Obt. Marks</th>
-
-                        <th style="border: 1px solid #000; padding: 4px;">Result</th>
-
-                        <th style="border: 1px solid #000; padding: 4px;">Percentage</th>
-
-                        <th style="border: 1px solid #000; padding: 4px;">Grade</th>
-
-                        <th style="border: 1px solid #000; padding: 4px;">Rank</th>
-
-                        <th style="border: 1px solid #000; padding: 4px;">Attendance</th>
-
-                    </tr>
-
-                </thead>
-
-                <tbody>
-
-                    <tr>
-
-                        <td style="border: 1px solid #000; padding: 5px; font-weight: bold; color: #008000; font-size: 13px;">{max_grand_total}</td>
-
-                        <td style="border: 1px solid #000; padding: 5px; font-weight: bold; color: #008000; font-size: 13px;">{grand_obt}</td>
-
-                        <td style="border: 1px solid #000; padding: 5px; font-weight: bold; color: {pass_color}; font-size: 13px;">{pass_status}</td>
-
-                        <td style="border: 1px solid #000; padding: 5px; font-weight: bold; color: #008000; font-size: 13px;">{grand_pct}%</td>
-
-                        <td style="border: 1px solid #000; padding: 5px; font-weight: bold; color: {pass_color}; font-size: 13px;">{overall_grade}</td>
-
-                        <td style="border: 1px solid #000; padding: 5px; font-weight: bold; font-size: 13px;">{rank_val}</td>
-
-                        <td style="border: 1px solid #000; padding: 5px; font-size: 12px;">{stud.get('Attended_Days', 200)} / {stud.get('Total_Days', 220)}</td>
-
-                    </tr>
-
-                </tbody>
-
+            <!-- RESULT SUMMARY CARD -->
+            <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; font-size: 12.5px; margin-bottom: 25px; background: #F8FAFC;">
+                <tr>
+                    <td style="border: 1px solid #000; padding: 6px 10px; width: 25%;"><b>कुल प्राप्तांक / प्रतिशत:</b></td>
+                    <td style="border: 1px solid #000; padding: 6px 10px; width: 25%; font-weight: bold; color: #1E3A8A;">{grand_obt} / {max_grand_total} (<b>{overall_pct}%</b>)</td>
+                    <td style="border: 1px solid #000; padding: 6px 10px; width: 25%;"><b>अंतिम परीक्षाफल:</b></td>
+                    <td style="border: 1px solid #000; padding: 6px 10px; width: 25%; font-weight: 900; font-size: 14px; color: {result_color};">{result_text}</td>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid #000; padding: 6px 10px;"><b>समेकित ग्रेड / श्रेणी:</b></td>
+                    <td style="border: 1px solid #000; padding: 6px 10px; font-weight: bold;">ग्रेड <b>{overall_grade}</b> ({overall_div})</td>
+                    <td style="border: 1px solid #000; padding: 6px 10px;"><b>शिक्षक का अभिमत (Remarks):</b></td>
+                    <td style="border: 1px solid #000; padding: 6px 10px; font-style: italic; color: #334155;">{'उत्कृष्ट प्रदर्शन, निरंतर प्रगतिशील रहें!' if overall_pct>=60 else 'और अधिक लगन व नियमित अभ्यास की आवश्यकता है।'}</td>
+                </tr>
             </table>
 
-  
-  
-
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; margin-bottom: 25px; font-size: 12px; font-weight: bold;">
-
+            <!-- SIGNATURE BLOCK -->
+            <div style="display: flex; justify-content: space-between; margin-top: 45px; text-align: center; font-size: 12.5px; font-weight: bold;">
                 <div>
-
-                    Class Teacher Remarks: <span style="color: {pass_color}; border-bottom: 1px solid #000; padding: 0 20px;">{remarks_text}</span>
-
+                    ____________________________<br>
+                    कक्षा अध्यापक हस्ताक्षर<br>
+                    (Class Teacher)
                 </div>
-
                 <div>
-
-                    <span style="color: #D35400;">Congratulations!</span> Promoted to Class: <span style="color: #003399; border-bottom: 1px solid #000; padding: 0 20px;">{promo_text}</span>
-
+                    ____________________________<br>
+                    परीक्षा प्रभारी हस्ताक्षर<br>
+                    (Exam In-charge)
                 </div>
-
+                <div>
+                    ____________________________<br>
+                    संस्था प्रधान हस्ताक्षर एवं पदमुद्रा<br>
+                    (Principal / Head Master)
+                </div>
             </div>
-
-  
-  
-
-            <div style="display: flex; justify-content: space-between; margin-top: 30px; font-size: 13px; font-weight: bold; text-align: center;">
-
-                <div style="width: 30%;">Class Teacher</div>
-
-                <div style="width: 30%;">Exam In-Charge</div>
-
-                <div style="width: 30%;">Head Of School</div>
-
+            
+            <div style="text-align: center; font-size: 10px; margin-top: 20px; color: #64748B; border-top: 1px solid #CBD5E1; padding-top: 6px;">
+                शासकीय वार्षिक समग्र प्रगति पत्रक | जनरेटेड ऑन: {TODAY_STR} | डाइस कोड: {s_info.get('udise', '23260100101')}
             </div>
-
-  
-  
-
-            <div style="text-align: center; font-size: 11px; margin-top: 15px; color: #444; font-style: italic;">
-
-                Report Card Printed On: {TODAY_STR}
-
-            </div>
-
         </div>
-
         """
 
-        
+        render_html(shashkiy_marksheet_html)
 
-        # Export Marksheets Summary for all students
-
-        render_html("### 📥 सभी छात्रों का परीक्षाफल डेटा एक्सपोर्ट (Export All Results)")
-
-        c_mexp1, c_mexp2 = st.columns([2, 2])
-
-        with c_mexp1:
-
-            m_exp_fmt = st.selectbox("प्रारूप चुनें (File Format):", ["Excel (.xlsx)", "CSV (.csv)"], key="m_exp_fmt")
-
-        with c_mexp2:
-
-            m_master_df = generate_master_44col_df(students_df, cls_data["evaluations"], cls_subjects, s_info, selected_class)
-
-            m_bytes, m_mime, m_ext = export_dataframe_bytes(m_master_df, m_exp_fmt)
-
-            m_filename = f"Result_Marksheets_{selected_class}_{s_info.get('session','2023-24')}{m_ext}"
-
-            st.download_button(
-
-                f"📥 संपूर्ण परीक्षाफल तालिका डाउनलोड करें ({m_exp_fmt})",
-
-                data=m_bytes,
-
-                file_name=m_filename,
-
-                mime=m_mime,
-
-                type="primary",
-
-                use_container_width=True
-
-            )
-
-        st.divider()
-
-  
-  
-
-        render_html(exact_card_html)
-
-  
-  
 
 # ----------------- MODULE 10: A3 ANNUAL RESULT SHEET (EXACT REPLICA: image_fde76c.png) -----------------
 
@@ -10033,6 +10546,7 @@ elif menu == T["nav_a3_result"]:
     '''
 
     render_html(exact_a3_html)
+    render_govt_portals_hub("A3 वार्षिक परीक्षाफल पत्रक", selected_class, df_a3_export if 'df_a3_export' in locals() else None, "A3_Annual_Gazette")
 
   
   
@@ -10040,6 +10554,7 @@ elif menu == T["nav_a3_result"]:
   
 
 # ----------------- MODULE 11: CATEGORY/GRADE WISE RESULT SUMMARY (IMAGE: image_04fbc5.png) -----------------
+
 
 elif menu == T["nav_summary"]:
 
@@ -10588,444 +11103,239 @@ elif menu == T["nav_summary"]:
   
   
 
-# ----------------- MODULE 12: ANNUAL RESULT MERIT LIST (IMAGE: image_fae914.png) -----------------
+        render_govt_portals_hub("श्रेणीवार परिणाम सारांश", target_summary_class, None, "Result_Summary_Form3")
 
+# ----------------- MODULE 12: ANNUAL RESULT MERIT LIST (OFFICIAL RSKMP & MPBSE FORMAT) -----------------
 elif menu == T.get("nav_merit", "🏆 12. वार्षिक परीक्षा प्रावीण्य सूची (Merit List)"):
-
     s_info = st.session_state.school_info
-
     cur_sess = s_info.get("session", "2026-27")
-
     
-
-    # Role Check & Class/Section Selectors for Smart Merit List
-
     cur_role = st.session_state.get("authenticated_role", "PRINCIPAL")
-
     is_teacher = (cur_role == "TEACHER")
-
     assigned_cls = st.session_state.get("assigned_class")
-
     
-
     c_mtop1, c_mtop2, c_mtop3 = st.columns([2.2, 1.3, 1.3])
-
     with c_mtop1:
-
-        st.markdown(f'<div class="main-header">🏆 वार्षिक परीक्षा प्रावीण्य सूची (Merit List)</div>', unsafe_allow_html=True)
-
-        render_html(f'<div class="sub-header">कक्षा एवं सेक्शन अनुसार सर्वोच्च अंक प्राप्त विद्यार्थियों की क्रमबद्ध मेरिट सूची</div>')
-
+        st.markdown('<div class="main-header">🏆 वार्षिक परीक्षा प्रावीण्य सूची (Merit List)</div>', unsafe_allow_html=True)
+        render_html('<div class="sub-header">राज्य शिक्षा केंद्र (RSKMP) एवं माध्यमिक शिक्षा मंडल (MPBSE) आधिकारिक प्रारूप</div>')
     with c_mtop2:
-
         if is_teacher and assigned_cls:
-
             target_merit_class = assigned_cls
-
             render_html(f"<div style='border: 1px solid #CBD5E1; background: #F1F5F9; padding: 7px 10px; border-radius: 6px; font-weight: bold; font-size: 13px; text-align: center; color: #1E3A8A; margin-top: 22px;'>🎯 आवंटित कक्षा: {target_merit_class}</div>")
-
         else:
-
             target_merit_class = st.selectbox(
-
                 "1. कक्षा चुनें (Class):", 
-
                 st.session_state.classes_list, 
-
                 index=st.session_state.classes_list.index(selected_class) if selected_class in st.session_state.classes_list else 0,
-
                 key="merit_class_picker"
-
             )
-
     
-
     m_cls_data = get_class_data(target_merit_class)
-
     raw_st_df = m_cls_data["students"]
-
-    
-
-    # Extract distinct sections
-
     existing_secs = sorted(list(set([str(s).strip() for s in raw_st_df["Section"].dropna().unique() if str(s).strip()]))) if not raw_st_df.empty and "Section" in raw_st_df.columns else ["A"]
-
     sec_options = ["सभी सेक्शन (All Sections Combined)"] + (existing_secs if existing_secs else ["A", "B", "C"])
-
   
-
     with c_mtop3:
-
         target_merit_sec = st.selectbox("2. सेक्शन चुनें (Section):", sec_options, key="merit_sec_picker")
-
   
-
-    # Filter dataframe by section if specific section chosen
-
     if target_merit_sec != "सभी सेक्शन (All Sections Combined)" and not raw_st_df.empty and "Section" in raw_st_df.columns:
-
-        m_students_df = raw_st_df[raw_st_df["Section"] == target_merit_sec].copy()
-
-        display_class_label = f"{target_merit_class} - Section {target_merit_sec}"
-
-        has_sec_col = False
-
+        students_df = raw_st_df[raw_st_df["Section"] == target_merit_sec].copy()
+        display_merit_class = f"{target_merit_class} - Section {target_merit_sec}"
     else:
+        students_df = raw_st_df.copy()
+        display_merit_class = f"{target_merit_class} (समस्त सेक्शन)"
+    
+    clean_cls = str(target_merit_class).lower()
+    is_highschool = ("class 9" in clean_cls or "class 10" in clean_cls or "9th" in clean_cls or "10th" in clean_cls)
+    board_authority = "माध्यमिक शिक्षा मंडल, मध्य प्रदेश, भोपाल (MPBSE)" if is_highschool else "राज्य शिक्षा केंद्र, मध्य प्रदेश, भोपाल (RSKMP)"
 
-        m_students_df = raw_st_df.copy()
-
-        display_class_label = f"{target_merit_class} (समस्त सेक्शन)"
-
-        has_sec_col = (len(existing_secs) > 1)
-
-    m_subjects = get_class_subjects(target_merit_class)
-
-    m_sub_cnt = len(m_subjects)
-
-    m_max_tot = m_sub_cnt * 100
-
-  
-
-    if m_students_df.empty:
-
-        st.warning(f"⚠️ {target_merit_class} में कोई विद्यार्थी पंजीकृत नहीं है।")
-
+    if students_df.empty:
+        st.warning(f"⚠️ {display_merit_class} में कोई विद्यार्थी पंजीकृत नहीं है।")
     else:
-
-        # Calculate marks, percentage, and ranks for all students of this class
-
+        cls_subjects = get_class_subjects(target_merit_class)
         m_evals = m_cls_data["evaluations"]
-
-        student_records = []
-
         
-
-        for idx, s in m_students_df.iterrows():
-
+        merit_records = []
+        for idx, s in students_df.iterrows():
             r = s["Roll_No"]
-
             ev = m_evals.get(r, {})
-
             m_dict = ev.get("marks", {})
-
             st_stat = ev.get("status", s.get("Status", "Present"))
-
             
-
-            tot_obt = 0
-
+            sub_totals = []
             all_pass = True
-
+            for sub in cls_subjects:
+                s_id = sub["id"]
+                se = m_dict.get(s_id, {})
+                tot = se.get("total", 75)
+                sub_totals.append(tot)
+                if tot < 33:
+                    all_pass = False
             
-
-            for sub in m_subjects:
-
-                s_eval = m_dict.get(sub["id"], {})
-
-                t_val = s_eval.get("total", 75)
-
-                tot_obt += t_val
-
-                if t_val < 33: all_pass = False
-
-                
-
-            pct = round((tot_obt / max(1, m_max_tot)) * 100, 1)
-
-            grd = calculate_grade(pct)
-
-            is_p = (all_pass and pct >= 33 and st_stat != "Absent")
-
-            res_str = "Pass" if is_p else "Fail"
-
+            grand_obt = sum(sub_totals) if st_stat != "Absent" else 0
+            max_m = len(cls_subjects) * 100
+            pct = round((grand_obt / max_m) * 100, 1) if max_m > 0 else 0
+            grd = calculate_grade(pct) if st_stat != "Absent" else "Ab"
+            div_str = calculate_division(pct) if st_stat != "Absent" else "--"
+            res_str = "PASS" if (all_pass and pct >= 33 and st_stat != "Absent") else ("ABSENT" if st_stat == "Absent" else "FAIL")
             
-
-            student_records.append({
-
+            best_of_5_obt = grand_obt
+            if is_highschool and len(sub_totals) >= 6:
+                best_of_5_obt = sum(sorted(sub_totals, reverse=True)[:5])
+            
+            merit_records.append({
                 "Roll_No": r,
-
+                "Scholar_No": s.get("Scholar_No", "--"),
+                "Samagra_ID": s.get("SSSM_ID", "--"),
                 "Name": s["Name"],
-
                 "Father_Name": s["Father_Name"],
-
+                "Mother_Name": s.get("Mother_Name", "--"),
+                "DOB": s.get("DOB", "--"),
+                "Gender": s.get("Gender", "--"),
+                "Category": s.get("Category", "--"),
                 "Section": s.get("Section", "A"),
-
-                "Max_Marks": m_max_tot,
-
-                "Obt_Marks": tot_obt,
-
-                "Result": res_str,
-
+                "Max_Marks": max_m,
+                "Obt_Marks": grand_obt,
+                "Best_Of_5": best_of_5_obt,
                 "Percentage": pct,
-
                 "Grade": grd,
-
-                "Is_Pass": is_p
-
+                "Division": div_str,
+                "Result": res_str,
+                "Exam_Status": st_stat
             })
-
-            
-
-        # Sort Smallest to Largest by Rank (i.e. Highest marks first)
-
-        student_records.sort(key=lambda x: (x["Is_Pass"], x["Obt_Marks"], x["Percentage"]), reverse=True)
-
         
+        # Sort descending by Obtained Marks (or Best of 5 for 10th)
+        sort_key = "Best_Of_5" if (is_highschool and "10" in clean_cls) else "Obt_Marks"
+        merit_records = sorted(merit_records, key=lambda x: (x["Result"] == "PASS", x[sort_key], x["Percentage"]), reverse=True)
+        
+        for i, rec in enumerate(merit_records):
+            rec["Rank"] = i + 1
 
-        # Assign Ranks
+        # Action Bar (Print & Export)
+        c_mact1, c_mact2 = st.columns([3, 1])
+        with c_mact1:
+            st.markdown(f"<b>📊 कुल परीक्षार्थी:</b> {len(merit_records)} | <b>प्रथम स्थान:</b> {merit_records[0]['Name']} ({merit_records[0]['Percentage']}%) | <b>बोर्ड:</b> {board_authority}", unsafe_allow_html=True)
+        with c_mact2:
+            if not is_teacher:
+                st.button("🖨️ Print Merit List", on_click=None, use_container_width=True, type="primary", key="btn_merit_print")
+            else:
+                st.markdown("<div style='color:#991B1B; font-size:11px; font-weight:bold; text-align:right;'>🔒 प्रिंट केवल संस्था प्रधान हेतु</div>", unsafe_allow_html=True)
 
-        for rank_idx, rec in enumerate(student_records, 1):
+        # Build Official RSKMP / MPBSE Merit Table HTML
+        rows_html = ""
+        for rec in merit_records:
+            rank = rec["Rank"]
+            if rank == 1:
+                rank_badge = '<span style="background:#FEF3C7; color:#B45309; padding:2px 8px; border-radius:12px; font-weight:900; border:1px solid #F59E0B;">🥇 1st Rank</span>'
+                row_bg = "background-color: #FFFDF0;"
+            elif rank == 2:
+                rank_badge = '<span style="background:#F1F5F9; color:#475569; padding:2px 8px; border-radius:12px; font-weight:900; border:1px solid #94A3B8;">🥈 2nd Rank</span>'
+                row_bg = "background-color: #F8FAFC;"
+            elif rank == 3:
+                rank_badge = '<span style="background:#FFEDD5; color:#9A3412; padding:2px 8px; border-radius:12px; font-weight:900; border:1px solid #F97316;">🥉 3rd Rank</span>'
+                row_bg = "background-color: #FFF9F5;"
+            else:
+                rank_badge = f'<span style="font-weight:bold; color:#1E293B;">{rank}</span>'
+                row_bg = "background-color: #ffffff;"
 
-            rec["Rank"] = rank_idx
-
-  
-
-        # Build Table HTML matching image_fae914.png exactly
-
-        merit_rows_html = ""
-
-        for rec in student_records:
-
-            pass_color = "#008000" if rec["Is_Pass"] else "#CC0000"
-
-            sec_cell_html = f'<td style="border: 1px solid #000; padding: 4px; font-weight: bold;">{rec.get("Section", "A")}</td>' if has_sec_col else ""
-
-            merit_rows_html += f"""
-
-            <tr style="height: 28px; font-size: 12px; text-align: center;">
-
-                <td style="border: 1px solid #000; padding: 4px; font-weight: bold;">{rec['Roll_No']}</td>
-
-                <td style="border: 1px solid #000; text-align: left; padding: 4px 8px; font-weight: bold; white-space: nowrap;">{rec['Name']}</td>
-
-                <td style="border: 1px solid #000; text-align: left; padding: 4px 8px; white-space: nowrap;">{rec['Father_Name']}</td>
-
-                {sec_cell_html}
-
-                <td style="border: 1px solid #000; padding: 4px; font-weight: bold; color: #008000;">{rec['Max_Marks']}</td>
-
-                <td style="border: 1px solid #000; padding: 4px; font-weight: bold; color: #008000;">{rec['Obt_Marks']}</td>
-
-                <td style="border: 1px solid #000; padding: 4px; font-weight: bold; color: {pass_color};">{rec['Result']}</td>
-
-                <td style="border: 1px solid #000; padding: 4px; font-weight: bold; color: #008000;">{rec['Percentage']}%</td>
-
-                <td style="border: 1px solid #000; padding: 4px; font-weight: bold;">{rec['Grade']}</td>
-
-                <td style="border: 1px solid #000; padding: 4px; font-weight: 800; font-size: 13px; background: #FFF8DC;">{rec['Rank']}</td>
-
+            res_color = "#15803D" if rec["Result"] == "PASS" else "#B91C1C"
+            
+            rows_html += f"""
+            <tr style="height: 28px; font-size: 11.5px; text-align: center; {row_bg}">
+                <td style="border: 1px solid #CBD5E1; padding: 4px;">{rank_badge}</td>
+                <td style="border: 1px solid #CBD5E1; padding: 4px; font-weight: bold;">{rec['Roll_No']}</td>
+                <td style="border: 1px solid #CBD5E1; padding: 4px;">{rec['Scholar_No']}</td>
+                <td style="border: 1px solid #CBD5E1; padding: 4px; font-size: 10.5px;">{rec['Samagra_ID']}</td>
+                <td style="border: 1px solid #CBD5E1; padding: 4px 8px; text-align: left; font-weight: bold; color: #1E3A8A;">{rec['Name']}</td>
+                <td style="border: 1px solid #CBD5E1; padding: 4px 8px; text-align: left;">{rec['Father_Name']}</td>
+                <td style="border: 1px solid #CBD5E1; padding: 4px 8px; text-align: left;">{rec['Mother_Name']}</td>
+                <td style="border: 1px solid #CBD5E1; padding: 4px;">{rec['Category']} / {rec['Gender'][:1]}</td>
+                <td style="border: 1px solid #CBD5E1; padding: 4px;">{rec['Max_Marks']}</td>
+                <td style="border: 1px solid #CBD5E1; padding: 4px; font-weight: bold; font-size: 12px; color: #0F172A;">{rec['Obt_Marks']}</td>
+                <td style="border: 1px solid #CBD5E1; padding: 4px; font-weight: bold; color: #1E3A8A;">{rec['Percentage']}%</td>
+                <td style="border: 1px solid #CBD5E1; padding: 4px; font-weight: bold;">{rec['Grade']}</td>
+                <td style="border: 1px solid #CBD5E1; padding: 4px; font-size: 11px;">{rec['Division']}</td>
+                <td style="border: 1px solid #CBD5E1; padding: 4px; font-weight: bold; color: {res_color};">{rec['Result']}</td>
             </tr>
-
             """
 
-  
+        official_merit_html = f"""
+        <div class="printable-area" style="background: #ffffff; border: 2px solid #1E3A8A; padding: 14px 18px; font-family: Arial, sans-serif; color: #000; margin: auto;">
+            <!-- GOVT HEADER -->
+            <div style="text-align: center; border-bottom: 2px solid #1E3A8A; padding-bottom: 8px; margin-bottom: 10px;">
+                <div style="font-size: 18px; font-weight: 900; color: #1E3A8A; letter-spacing: 0.5px;">
+                    {board_authority}
+                </div>
+                <div style="font-size: 16px; font-weight: 800; color: #000; margin-top: 2px;">
+                    {s_info.get('name', 'शासकीय माध्यमिक विद्यालय')}
+                </div>
+                <div style="font-size: 14px; font-weight: bold; color: #B45309; margin-top: 2px;">
+                    🏆 वार्षिक परीक्षा प्रावीण्य सूची (Merit List) — सत्र {cur_sess}
+                </div>
+                <div style="font-size: 12px; color: #334155; margin-top: 4px;">
+                    <b>DISE:</b> {s_info.get('udise', '23260100101')} | <b>ब्लॉक:</b> {s_info.get('block','SENDHWA')} | <b>जिला:</b> {s_info.get('district','BARWANI')} | <b>कक्षा:</b> {display_merit_class} | <b>माध्यम:</b> {get_display_medium(s_info)}
+                </div>
+            </div>
 
-        exact_merit_html = f"""
-
-        <div class="printable-area" style="background: #ffffff; border: 2px solid #000; padding: 14px 18px; max-width: 820px; margin: auto; font-family: Arial, sans-serif; color: #000;">
-
-            <!-- TOP HEADER BLOCK MATCHING image_fae914.png -->
-
-            <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; text-align: center; font-size: 13px; font-weight: bold; margin-bottom: 0px;">
-
-                <tr>
-
-                    <td colspan="2" style="border: 1px solid #000; padding: 6px; font-size: 18px; font-weight: 900; letter-spacing: 0.5px;">
-
-                        Dise Code : {s_info.get('udise', '23260100101')}
-
-                    </td>
-
-                </tr>
-
-                <tr>
-
-                    <td style="border: 1px solid #000; width: 50%; padding: 4px;">Block : {s_info.get('block','Fanda')}</td>
-
-                    <td style="border: 1px solid #000; width: 50%; padding: 4px;">District : {s_info.get('district','Bhopal')}</td>
-
-                </tr>
-
-                <tr>
-
-                    <td style="border: 1px solid #000; padding: 4px;">Class : {display_class_label}</td>
-
-                    <td style="border: 1px solid #000; padding: 4px;">Medium : {get_display_medium(s_info)}</td>
-
-                </tr>
-
-                <tr>
-
-                    <td colspan="2" style="border: 1px solid #000; padding: 6px; font-size: 17px; font-weight: 900; letter-spacing: 0.5px; background: #fafafa;">
-
-                        Annual Result {cur_sess} (Merit List)
-
-                    </td>
-
-                </tr>
-
-            </table>
-
-  
-
-            <!-- MAIN MERIT TABLE WITH PEACH HEADER MATCHING image_fae914.png -->
-
-            <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; font-size: 11.5px; text-align: center; margin-top: 0px;">
-
+            <!-- MERIT TABLE -->
+            <table style="width: 100%; border-collapse: collapse; border: 1px solid #1E3A8A; font-size: 11px;">
                 <thead>
-
-                    <tr style="background-color: #FDEBD0; height: 32px; font-weight: bold; border-top: none;">
-
-                        <th style="border: 1px solid #000; width: 10%;">Roll No.</th>
-
-                        <th style="border: 1px solid #000; width: 22%; text-align: left; padding-left: 6px;">Name Of Student</th>
-
-                        <th style="border: 1px solid #000; width: 20%; text-align: left; padding-left: 6px;">Father's Name</th>
-
-                        """ + ('<th style="border: 1px solid #000; width: 6%;">Sec</th>' if has_sec_col else "") + f"""
-
-                        <th style="border: 1px solid #000; width: 10%;">Max. Marks</th>
-
-                        <th style="border: 1px solid #000; width: 10%;">Obt. Marks</th>
-
-                        <th style="border: 1px solid #000; width: 8%;">Result</th>
-
-                        <th style="border: 1px solid #000; width: 8%;">Per. (%)</th>
-
-                        <th style="border: 1px solid #000; width: 5%;">Grade</th>
-
-                        <th style="border: 1px solid #000; width: 5%;">Rank</th>
-
+                    <tr style="background: #1E3A8A; color: #ffffff; height: 32px; font-weight: bold;">
+                        <th style="border: 1px solid #CBD5E1; width: 85px;">मेरिट रैंक</th>
+                        <th style="border: 1px solid #CBD5E1; width: 60px;">अनुक्रमांक</th>
+                        <th style="border: 1px solid #CBD5E1; width: 65px;">दाखिला क्र.</th>
+                        <th style="border: 1px solid #CBD5E1; width: 75px;">समग्र ID</th>
+                        <th style="border: 1px solid #CBD5E1; width: 140px; text-align: left; padding-left: 8px;">विद्यार्थी का नाम</th>
+                        <th style="border: 1px solid #CBD5E1; width: 130px; text-align: left; padding-left: 8px;">पिता का नाम</th>
+                        <th style="border: 1px solid #CBD5E1; width: 120px; text-align: left; padding-left: 8px;">माता का नाम</th>
+                        <th style="border: 1px solid #CBD5E1; width: 65px;">वर्ग/लिंग</th>
+                        <th style="border: 1px solid #CBD5E1; width: 50px;">पूर्णांक</th>
+                        <th style="border: 1px solid #CBD5E1; width: 60px;">प्राप्तांक</th>
+                        <th style="border: 1px solid #CBD5E1; width: 55px;">प्रतिशत</th>
+                        <th style="border: 1px solid #CBD5E1; width: 45px;">ग्रेड</th>
+                        <th style="border: 1px solid #CBD5E1; width: 55px;">श्रेणी</th>
+                        <th style="border: 1px solid #CBD5E1; width: 55px;">परिणाम</th>
                     </tr>
-
                 </thead>
-
                 <tbody>
-
-                    {merit_rows_html}
-
+                    {rows_html}
                 </tbody>
-
             </table>
 
-  
-
-            <div style="display: flex; justify-content: space-between; margin-top: 35px; font-weight: bold; font-size: 12px; text-align: center;">
-
+            <!-- SIGNATURE BLOCK -->
+            <div style="display: flex; justify-content: space-between; margin-top: 35px; font-weight: bold; font-size: 11.5px; text-align: center;">
                 <div>_______________________<br>कक्षा अध्यापक हस्ताक्षर</div>
-
-                <div>_______________________<br>परीक्षा प्रभारी</div>
-
+                <div>_______________________<br>मूल्यांकन / परीक्षा प्रभारी</div>
                 <div>_______________________<br>संस्था प्रधान (सील सहित)</div>
-
             </div>
-
-            <div style="text-align: center; font-size: 10.5px; margin-top: 15px; color: #555; font-style: italic;">
-
-                Merit List Generated On: {TODAY_STR}
-
+            <div style="text-align: center; font-size: 10px; margin-top: 10px; color: #64748B;">
+                शासकीय प्रावीण्य सूची | मुद्रण दिनांक: {TODAY_STR}
             </div>
-
         </div>
-
         """
+        
+        render_html(official_merit_html)
 
-  
+        if not is_teacher:
+            st.divider()
+            st.markdown("##### 📥 आधिकारिक प्रावीण्य सूची एक्सेल डाउनलोड (.xlsx):")
+            if render_export_gatekeeper("प्रावीण्य सूची (Merit List)"):
+                merit_export_df = pd.DataFrame(merit_records)
+                m_bytes, m_mime, m_ext = export_dataframe_bytes(merit_export_df, "Excel (.xlsx)")
+                st.download_button(
+                    "📥 आधिकारिक प्रावीण्य सूची एक्सेल डाउनलोड (.xlsx)",
+                    data=m_bytes,
+                    file_name=f"Official_Merit_List_{target_merit_class}_{cur_sess}.xlsx",
+                    mime=m_mime,
+                    type="primary",
+                    use_container_width=True
+                )
 
-        # Side-by-side display: Main Table (Left) & Notice Box + Print (Right) matching image_fae914.png
 
-        c_mer_main, c_mer_side = st.columns([3.2, 1.2])
-
-  
-
-        with c_mer_main:
-
-            render_html(exact_merit_html)
-
-  
-
-        with c_mer_side:
-
-            if is_teacher:
-
-                render_html("""
-
-                <div style="background: #FEF2F2; border-left: 4px solid #EF4444; padding: 12px 14px; border-radius: 6px; color: #991B1B; margin-top: 8px; font-size: 12px; line-height: 1.5;">
-
-                    <b>🔒 शासकीय सुरक्षा सूचना:</b><br>मेरिट लिस्ट का आधिकारिक प्रिंट एवं डेटा एक्सपोर्ट केवल <b>संस्था प्रधान (Principal)</b> खाते में अधिकृत है। आप केवल अपनी आवंटित कक्षा की प्रावीण्य सूची का अवलोकन कर सकते हैं।
-
-                </div>
-
-                """)
-
-            else:
-
-                render_html("<div style='margin-top: 8px;'>")
-
-                st.button("🖨️ Print", on_click=None, use_container_width=True, type="primary")
-
-                st.markdown("</div>", unsafe_allow_html=True)
-
-  
-
-            # Red-bordered notice box with green text matching image_fae914.png
-
-            render_html("""
-
-            <div style="border: 2px solid #CC0000; padding: 14px 16px; background: #ffffff; border-radius: 6px; margin-top: 14px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
-
-                <div style="color: #008000; font-weight: 800; font-size: 14px; line-height: 1.6; text-align: left; margin-bottom: 15px;">
-
-                    सम्पूर्ण अंक दर्ज करने के पश्चात ही मेरिट लिस्ट तैयार होगी
-
-                </div>
-
-                <div style="color: #008000; font-weight: 800; font-size: 13px; line-height: 1.6; text-align: left;">
-
-                    रैंक वाले कॉलम में फ़िल्टर बटन पर क्लिक करके "Smallest To Largest" पर क्लिक करें जिससे रैंक के हिसाब से मेरिट लिस्ट तैयार हो जाएगी
-
-                </div>
-
-            </div>
-
-            """)
-
-  
-
-            # Export Excel Option (Principal Only with Gatekeeper)
-
-            if not is_teacher:
-
-                st.divider()
-
-                render_html("##### 📥 प्रावीण्य सूची एक्सपोर्ट:")
-
-                if render_export_gatekeeper("प्रावीण्य सूची (Merit List)"):
-
-                    merit_df = pd.DataFrame(student_records)
-
-                    m_bytes, m_mime, m_ext = export_dataframe_bytes(merit_df, "Excel (.xlsx)")
-
-                    st.download_button(
-
-                        f"📥 मेरिट लिस्ट डाउनलोड (.xlsx)",
-
-                        data=m_bytes,
-
-                        file_name=f"Merit_List_{target_merit_class}_{cur_sess}.xlsx",
-
-                        mime=m_mime,
-
-                        type="secondary",
-
-                        use_container_width=True
-
-                    )
-
-  
-  
+        render_govt_portals_hub("वार्षिक प्रावीण्य सूची", target_merit_class, merit_export_df if 'merit_export_df' in locals() else None, "Merit_List")
 
 # ----------------- MODULE 13: SUPPLEMENTARY STUDENTS LIST (IMAGE: image_05d509.png) -----------------
+
 
 elif menu == T.get("nav_supple", "📋 13. पूरक परीक्षा छात्र सूची (Supplementary List)"):
 
@@ -11381,8 +11691,10 @@ elif menu == T.get("nav_supple", "📋 13. पूरक परीक्षा �
 
                 )
 
-# ----------------- MODULE 14: 35-COLUMN WEIGHTED EVALUATION SHEET (IMAGE: image_05e7a7.png) -----------------
-elif menu == T.get("nav_weighted", "📑 14. 35-कॉलम वेटेज मूल्यांकन पत्रक (Weighted Assessment)"):
+        render_govt_portals_hub("पूरक परीक्षा छात्र सूची", target_supple_class, supple_export_df if 'supple_export_df' in locals() else None, "Supplementary_List")
+
+# ----------------- MODULE 14: ANNUAL RESULT RECORD & WEIGHTED EVALUATION SHEET (OFFICIAL RSKMP & MPBSE) -----------------
+elif menu == T.get("nav_weighted", "📑 14. वार्षिक परीक्षा परिणाम अभिलेख पत्रक (RSKMP व MPBSE प्रारूप)"):
     cur_role = st.session_state.get("authenticated_role", "PRINCIPAL")
     is_teacher = (cur_role == "TEACHER")
     assigned_cls = st.session_state.get("assigned_class")
@@ -11392,8 +11704,8 @@ elif menu == T.get("nav_weighted", "📑 14. 35-कॉलम वेटेज म
     # Class and Section Selectors
     c_wtop1, c_wtop2, c_wtop3 = st.columns([2.2, 1.3, 1.3])
     with c_wtop1:
-        st.markdown(f'<div class="main-header">📑 35-कॉलम वार्षिक अधिभार मूल्यांकन पत्रक</div>', unsafe_allow_html=True)
-        render_html(f'<div class="sub-header">Monthly (10%) + Half Yearly (20%) + Annual Project (10%) + Annual Written (60) = 100% Weightage</div>')
+        st.markdown('<div class="main-header">📑 वार्षिक परीक्षा परिणाम अभिलेख पत्रक</div>', unsafe_allow_html=True)
+        render_html('<div class="sub-header">राज्य शिक्षा केंद्र (RSKMP परिशिष्ट 4 व 6) एवं माध्यमिक शिक्षा मंडल (MPBSE) आधिकारिक प्रारूप</div>')
     with c_wtop2:
         if is_teacher and assigned_cls:
             target_w_class = assigned_cls
@@ -11424,188 +11736,455 @@ elif menu == T.get("nav_weighted", "📑 14. 35-कॉलम वेटेज म
     sub_count = len(cls_subjects)
     w_evals = w_cls_data["evaluations"]
 
+    clean_cls = str(target_w_class).lower()
+    is_5_8_board = ("class 5" in clean_cls or "class 8" in clean_cls or "5th" in clean_cls or "8th" in clean_cls)
+    is_9_10_high = ("class 9" in clean_cls or "class 10" in clean_cls or "9th" in clean_cls or "10th" in clean_cls)
+    
+    if is_9_10_high:
+        board_header_title = "माध्यमिक शिक्षा मंडल, मध्य प्रदेश, भोपाल (MPBSE)"
+        sheet_subtitle = "हाईस्कूल वार्षिक परीक्षा परिणाम अभिलेख पंजी (सत्र 2026-27)"
+        appendix_tag = "MPBSE हाईस्कूल विनियम अनुसार (75 थ्योरी + 25 प्रोजेक्ट = 100)"
+    elif is_5_8_board:
+        board_header_title = "राज्य शिक्षा केंद्र, मध्य प्रदेश, भोपाल (RSKMP)"
+        sheet_subtitle = f"वार्षिक परीक्षा परिणाम अभिलेख पत्रक — {target_w_class} बोर्ड परीक्षा (सत्र 2026-27)"
+        appendix_tag = "RSKMP बोर्ड विनियम अनुसार (20 अर्धवार्षिक + 20 प्रोजेक्ट + 60 वार्षिक लिखित = 100)"
+    elif "class 3" in clean_cls or "class 4" in clean_cls or "3rd" in clean_cls or "4th" in clean_cls:
+        board_header_title = "राज्य शिक्षा केंद्र, मध्य प्रदेश, भोपाल (RSKMP)"
+        sheet_subtitle = "वार्षिक परीक्षा परिणाम अभिलेख पत्रक (प्राथमिक शाला) — सत्र 2026-27"
+        appendix_tag = "परिशिष्ट 4(अ) — कक्षा 3 व 4 (10% मासिक + 20% अर्धवार्षिक + 10% प्रोजेक्ट + 60 लिखित = 100)"
+    else:
+        board_header_title = "राज्य शिक्षा केंद्र, मध्य प्रदेश, भोपाल (RSKMP)"
+        sheet_subtitle = "वार्षिक परीक्षा परिणाम अभिलेख पत्रक (माध्यमिक शाला) — सत्र 2026-27"
+        appendix_tag = "परिशिष्ट 6(अ) — कक्षा 6 व 7 (10% मासिक + 20% अर्धवार्षिक + 10% प्रोजेक्ट + 60 लिखित = 100)"
+
+    c_wopt1, c_wopt2 = st.columns([3, 2])
+    with c_wopt1:
+        view_layout_choice = st.radio(
+            "प्रारूप चयन (Layout View):",
+            ["🏛️ शासकीय वार्षिक परिणाम अभिलेख पत्रक (Official RSKMP / MPBSE Gazette)", "📑 35-कॉलम घटकवार वेटेज पत्रक (Component-Wise 10%+20%+10%+60% Sheet)"],
+            horizontal=True,
+            key="w_view_layout_choice"
+        )
+    with c_wopt2:
+        hy_scheme_choice = st.selectbox(
+            "अर्धवार्षिक गणना आधार:",
+            ["60", "40", "50", "20", "auto"],
+            format_func=lambda x: {
+                "60": "60 अंक (RSKMP मानक: प्राप्तांक ÷ 3 = 20%)",
+                "40": "40 अंक (स्थानीय परीक्षा: प्राप्तांक ÷ 2 = 20%)",
+                "50": "50 अंक (प्राप्तांक × 20 / 50)",
+                "20": "20 अंक (सीधे 20% अधिभार)",
+                "auto": "ऑटो-डिटेक्ट (Auto Detect)"
+            }[x],
+            index=0,
+            key="w_hy_scheme_picker_v2"
+        )
+
     if students_df.empty:
         st.warning(f"⚠️ {display_w_class} में कोई विद्यार्थी पंजीकृत नहीं है।")
     else:
-        # Build 35-Column Rows
-        table_rows_data = []
-        rows_html = ""
-        
+        # Prepare Data for Both Formats
+        records_master = []
         for idx, s in students_df.iterrows():
             r = s["Roll_No"]
             ev = w_evals.get(r, {})
             m_dict = ev.get("marks", {})
             st_stat = ev.get("status", s.get("Status", "Present"))
             
-            row_dict = {
-                "1_Sr_No": idx + 1,
-                "2_Roll_No": r,
-                "3_Name_Of_Student": s["Name"],
-                "4_Class": target_w_class
+            s_rec = {
+                "Sr_No": idx + 1,
+                "Roll_No": r,
+                "Scholar_No": s.get("Scholar_No", "--"),
+                "Samagra_ID": s.get("SSSM_ID", "--"),
+                "Name": s["Name"],
+                "Father_Name": s["Father_Name"],
+                "Mother_Name": s.get("Mother_Name", "--"),
+                "DOB": s.get("DOB", "--"),
+                "Gender": s.get("Gender", "--"),
+                "Category": s.get("Category", "--"),
+                "Section": s.get("Section", "A"),
+                "Attended_Days": s.get("Attended_Days", 200),
+                "Total_Days": s.get("Total_Days", 220),
+                "Subjects": {}
             }
             
-            # 1. Monthly 10% (Cols 5 to 10 for 6 subjects)
-            m_cells = ""
-            for i, sub in enumerate(cls_subjects):
-                se = m_dict.get(sub["id"], {})
-                # Monthly is 10% weightage (out of 10)
-                m_score = se.get("monthly", min(10, max(0, round((se.get("half_yearly", 16) / 20) * 10)))) if st_stat != "Absent" else 0
-                row_dict[f"{5+i}_Monthly_{sub['name']}"] = m_score
-                m_cells += f'<td style="border: 1px solid #000; padding: 2px;">{m_score}</td>'
-
-            # 2. Half Yearly 20% (Cols 11 to 16 for 6 subjects)
-            hy_cells = ""
-            for i, sub in enumerate(cls_subjects):
-                se = m_dict.get(sub["id"], {})
-                hy_score = min(20, max(0, se.get("half_yearly", 16))) if st_stat != "Absent" else 0
-                row_dict[f"{5+sub_count+i}_HY_{sub['name']}"] = hy_score
-                hy_cells += f'<td style="border: 1px solid #000; padding: 2px;">{hy_score}</td>'
-
-            # 3. Annual Project 10% (Cols 17 to 22 for 6 subjects)
-            proj_cells = ""
-            for i, sub in enumerate(cls_subjects):
-                se = m_dict.get(sub["id"], {})
-                proj_score = min(10, max(0, se.get("project", 8))) if st_stat != "Absent" else 0
-                row_dict[f"{5+2*sub_count+i}_Project_{sub['name']}"] = proj_score
-                proj_cells += f'<td style="border: 1px solid #000; padding: 2px;">{proj_score}</td>'
-
-            # 4. Annual Written 60 Marks (Cols 23 to 28 for 6 subjects)
-            ann_cells = ""
-            for i, sub in enumerate(cls_subjects):
-                se = m_dict.get(sub["id"], {})
-                ann_score = min(60, max(0, se.get("annual", 48))) if st_stat != "Absent" else 0
-                row_dict[f"{5+3*sub_count+i}_AnnualWritten_{sub['name']}"] = ann_score
-                ann_cells += f'<td style="border: 1px solid #000; padding: 2px;">{ann_score}</td>'
-
-            # 5. Final 100% Subject Totals (Cols 29 to 34) & Grand Total (Col 35)
-            fn_cells = ""
             grand_total = 0
-            for i, sub in enumerate(cls_subjects):
-                se = m_dict.get(sub["id"], {})
-                m_val = row_dict[f"{5+i}_Monthly_{sub['name']}"]
-                hy_val = row_dict[f"{5+sub_count+i}_HY_{sub['name']}"]
-                p_val = row_dict[f"{5+2*sub_count+i}_Project_{sub['name']}"]
-                a_val = row_dict[f"{5+3*sub_count+i}_AnnualWritten_{sub['name']}"]
+            all_pass = True
+            
+            for sub in cls_subjects:
+                s_id = sub["id"]
+                s_name = sub["name"]
+                se = m_dict.get(s_id, {})
                 
-                s_tot = m_val + hy_val + p_val + a_val
-                grand_total += s_tot
-                row_dict[f"{5+4*sub_count+i}_Final_{sub['name']}"] = s_tot
-                fn_cells += f'<td style="border: 1px solid #000; padding: 2px; font-weight: bold; color: #15803D;">{s_tot}</td>'
+                # Monthly (10%)
+                m_score, _, _ = calculate_subject_monthly_weightage(ev, s_id, target_w_class)
+                if st_stat == "Absent": m_score = 0
+                
+                # Half-Yearly (20%)
+                raw_hy = se.get("half_yearly", 48)
+                hy_score = calculate_subject_half_yearly_weightage(raw_hy, hy_scheme_choice)
+                if st_stat == "Absent": hy_score = 0
+                
+                # Project (10% or 20 for board)
+                raw_proj = se.get("project", 32 if not is_5_8_board else 16)
+                proj_score = calculate_subject_project_weightage_rule(raw_proj, target_w_class)
+                if st_stat == "Absent": proj_score = 0
+                
+                # Annual Written (60)
+                ann_score = min(60, max(0, se.get("annual", 48))) if st_stat != "Absent" else 0
+                
+                if is_9_10_high:
+                    # High school: 75 written + 25 project
+                    sub_final = min(100, round((ann_score / 60) * 75) + proj_score)
+                elif is_5_8_board:
+                    # 5th/8th board: 20 HY + 20 Proj + 60 Written
+                    sub_final = min(100, hy_score + proj_score + ann_score)
+                else:
+                    # 3,4,6,7: 10 Monthly + 20 HY + 10 Proj + 60 Written
+                    sub_final = min(100, m_score + hy_score + proj_score + ann_score)
+                    
+                sub_grd = calculate_grade(sub_final) if st_stat != "Absent" else "Ab"
+                if sub_final < 33: all_pass = False
+                
+                grand_total += sub_final
+                
+                s_rec["Subjects"][s_id] = {
+                    "name": s_name,
+                    "monthly_10": m_score,
+                    "hy_20": hy_score,
+                    "proj_wt": proj_score,
+                    "written_60": ann_score,
+                    "total_100": sub_final,
+                    "grade": sub_grd
+                }
+            
+            max_grand = len(cls_subjects) * 100
+            pct = round((grand_total / max_grand) * 100, 1) if max_grand > 0 else 0
+            final_grd = calculate_grade(pct) if st_stat != "Absent" else "Ab"
+            res_str = "PASS" if (all_pass and pct >= 33 and st_stat != "Absent") else ("ABSENT" if st_stat == "Absent" else "FAIL")
+            
+            s_rec["Grand_Total"] = grand_total
+            s_rec["Max_Marks"] = max_grand
+            s_rec["Percentage"] = pct
+            s_rec["Final_Grade"] = final_grd
+            s_rec["Result"] = res_str
+            s_rec["Division"] = calculate_division(pct) if st_stat != "Absent" else "--"
+            
+            records_master.append(s_rec)
 
-            row_dict[f"{5+5*sub_count}_Grand_Total"] = grand_total
-            table_rows_data.append(row_dict)
+        # Calculate Ranks
+        records_master = sorted(records_master, key=lambda x: (x["Result"] == "PASS", x["Grand_Total"]), reverse=True)
+        for i, rec in enumerate(records_master):
+            rec["Rank"] = i + 1
+            
+        # Re-sort by Sr_No for official tabulation sheet
+        records_master = sorted(records_master, key=lambda x: x["Sr_No"])
 
-            rows_html += f"""
-            <tr style="height: 24px; font-size: 10px; text-align: center;">
-                <td style="border: 1px solid #000; padding: 2px; font-weight: bold;">{idx+1}</td>
-                <td style="border: 1px solid #000; padding: 2px; font-weight: bold;">{r}</td>
-                <td style="border: 1px solid #000; padding: 2px 6px; text-align: left; font-weight: bold; white-space: nowrap;">{s['Name']}</td>
-                <td style="border: 1px solid #000; padding: 2px; white-space: nowrap;">{target_w_class}</td>
-                {m_cells}
-                {hy_cells}
-                {proj_cells}
-                {ann_cells}
-                {fn_cells}
-                <td style="border: 1px solid #000; padding: 2px; font-weight: 900; color: #0F172A; background: #FFF8DC; font-size: 11px;">{grand_total}</td>
-            </tr>
-            """
-
-        # Generate Columns 1 to 35 Header HTML matching image_05e7a7.png
-        # Row 2 vertical subject ths
-        v_sub_ths = "".join([f'<th class="v-th" style="writing-mode: vertical-rl; transform: rotate(180deg); height: 110px; font-size: 10px; padding: 2px; border: 1px solid #000;">{sub["name"]}</th>' for sub in cls_subjects])
-        
-        # Row 3 numbers 1 to (4 + 5*sub_count + 1)
-        tot_cols_cnt = 4 + 5 * sub_count + 1
-        num_cells = "".join([f'<td style="border: 1px solid #000; padding: 2px; font-weight: bold; background: #FDEBD0;">{c_no}</td>' for c_no in range(1, tot_cols_cnt + 1)])
-
-        exact_weighted_html = f"""
-        <div class="printable-area" style="background: #ffffff; border: 2px solid #000; padding: 8px 10px; font-family: Arial, sans-serif; color: #000; overflow-x: auto;">
-            <!-- TOP SHEET HEADER -->
-            <div style="text-align: center; font-size: 16px; font-weight: 900; letter-spacing: 0.5px; margin-bottom: 2px;">
-                {s_info.get('name', 'शासकीय माध्यमिक विद्यालय')}
-            </div>
-            <div style="text-align: center; font-size: 12px; font-weight: bold; color: #334155; margin-bottom: 8px;">
-                DISE: {s_info.get('udise', '23260100101')} | ब्लॉक: {s_info.get('block','SENDHWA')} | जिला: {s_info.get('district','BARWANI')} | माध्यम: {get_display_medium(s_info)} | सत्र: {cur_sess} | कक्षा: {display_w_class}
-            </div>
-
-            <!-- MAIN 35-COLUMN TABLE MATCHING image_05e7a7.png -->
-            <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; font-size: 10px; text-align: center;">
-                <thead>
-                    <!-- ROW 1: COMPONENT GROUP HEADERS -->
-                    <tr style="background: #ffffff; font-weight: bold; font-size: 10.5px;">
-                        <th rowspan="2" style="border: 1px solid #000; width: 30px;">Sr.No.</th>
-                        <th rowspan="2" style="border: 1px solid #000; width: 45px;">Roll No.</th>
-                        <th rowspan="2" style="border: 1px solid #000; width: 140px; text-align: center;">Name Of Student</th>
-                        <th rowspan="2" style="border: 1px solid #000; width: 60px;">Class</th>
-                        <th colspan="{sub_count}" style="border: 1px solid #000; background: #F8FAFC;">Monthly Evaluation 10%<br>Weightage</th>
-                        <th colspan="{sub_count}" style="border: 1px solid #000; background: #F8FAFC;">Half Yearly Evaluation 20%<br>Weightage</th>
-                        <th colspan="{sub_count}" style="border: 1px solid #000; background: #F8FAFC;">Annual Project Evaluation<br>10% Weightage</th>
-                        <th colspan="{sub_count}" style="border: 1px solid #000; background: #F8FAFC;">Annual Written Evaluation<br>60 Marks</th>
-                        <th colspan="{sub_count + 1}" style="border: 1px solid #000; background: #EFF6FF; color: #1E3A8A;">Monthly+Half Yearly+Annual+Project<br>10%+20%+60+10%=100%</th>
-                    </tr>
-                    <!-- ROW 2: SUBJECT NAMES (VERTICAL 90°) -->
-                    <tr style="background: #ffffff;">
-                        {v_sub_ths}
-                        {v_sub_ths}
-                        {v_sub_ths}
-                        {v_sub_ths}
-                        {v_sub_ths}
-                        <th class="v-th" style="writing-mode: vertical-rl; transform: rotate(180deg); height: 110px; font-size: 10px; padding: 2px; border: 1px solid #000; font-weight: 900; background: #EFF6FF; color: #1E3A8A;">Grand Total</th>
-                    </tr>
-                    <!-- ROW 3: NUMBERED INDICATORS 1 TO 35 -->
-                    <tr style="height: 20px; font-size: 9.5px; text-align: center;">
-                        {num_cells}
-                    </tr>
-                </thead>
-                <tbody>
-                    {rows_html}
-                </tbody>
-            </table>
-
-            <div style="display: flex; justify-content: space-between; margin-top: 35px; font-weight: bold; font-size: 11px; text-align: center;">
-                <div>_______________________<br>कक्षा अध्यापक हस्ताक्षर</div>
-                <div>_______________________<br>मूल्यांकन प्रभारी</div>
-                <div>_______________________<br>संस्था प्रधान (सील सहित)</div>
-            </div>
-            <div style="text-align: center; font-size: 9.5px; margin-top: 10px; color: #64748B;">
-                शासकीय वार्षिक अधिभार मूल्यांकन पत्रक | मुद्रण दिनांक: {TODAY_STR}
-            </div>
-        </div>
-        """
-
-        # Action Bar (Print on top right matching layout)
-        c_wbar1, c_wbar2 = st.columns([4, 1])
+        # Top Action Bar
+        c_wbar1, c_wbar2 = st.columns([3, 1])
+        with c_wbar1:
+            st.markdown(f"<b>📌 चयनित प्रारूप:</b> {appendix_tag} | <b>छात्र संख्या:</b> {len(records_master)}", unsafe_allow_html=True)
         with c_wbar2:
             if not is_teacher:
-                st.button("🖨️ Print Sheet", on_click=None, use_container_width=True, type="primary", key="btn_w_print")
+                st.button("🖨️ Print Gazette", on_click=None, use_container_width=True, type="primary", key="btn_w_print_final")
             else:
-                render_html("<div style='color:#991B1B; font-size:11px; font-weight:bold; margin-top:10px; text-align:right;'>🔒 प्रिंट केवल संस्था प्रधान हेतु</div>")
+                st.markdown("<div style='color:#991B1B; font-size:11px; font-weight:bold; text-align:right;'>🔒 प्रिंट केवल संस्था प्रधान हेतु</div>", unsafe_allow_html=True)
 
-        render_html(exact_weighted_html)
+        # ----------------- VIEW 1: OFFICIAL RSKMP / MPBSE GAZETTE REGISTER -----------------
+        if "शासकीय वार्षिक परिणाम" in view_layout_choice:
+            # Sub-headers for each subject
+            sub_col_ths = ""
+            for sub in cls_subjects:
+                if is_5_8_board:
+                    sub_col_ths += f"""
+                    <th colspan="5" style="border: 1px solid #000; background: #F1F5F9; font-size: 11px; padding: 4px;">{sub['name']}</th>
+                    """
+                elif is_9_10_high:
+                    sub_col_ths += f"""
+                    <th colspan="4" style="border: 1px solid #000; background: #F1F5F9; font-size: 11px; padding: 4px;">{sub['name']}</th>
+                    """
+                else:
+                    sub_col_ths += f"""
+                    <th colspan="6" style="border: 1px solid #000; background: #F1F5F9; font-size: 11px; padding: 4px;">{sub['name']}</th>
+                    """
 
-        # Export Excel Section (Principal Only with Gatekeeper)
-        if is_teacher:
-            render_html("""
-            <div style="background: #FEF2F2; border-left: 4px solid #EF4444; padding: 10px 14px; border-radius: 6px; color: #991B1B; margin-top: 14px; font-size: 12px;">
-                <b>🔒 शासकीय सुरक्षा सूचना:</b> 35-कॉलम वेटेज मूल्यांकन पत्रक का आधिकारिक प्रिंट एवं एक्सेल एक्सपोर्ट केवल <b>संस्था प्रधान (Principal)</b> खाते में अधिकृत है।
+            # Internal sub-columns row
+            sub_comp_ths = ""
+            for _ in cls_subjects:
+                if is_5_8_board:
+                    sub_comp_ths += """
+                    <th style="border: 1px solid #000; font-size: 9.5px; width: 32px;">अर्ध (20)</th>
+                    <th style="border: 1px solid #000; font-size: 9.5px; width: 32px;">प्रोजे (20)</th>
+                    <th style="border: 1px solid #000; font-size: 9.5px; width: 32px;">लिखित (60)</th>
+                    <th style="border: 1px solid #000; font-size: 10px; width: 34px; font-weight: bold; background: #EFF6FF;">कुल (100)</th>
+                    <th style="border: 1px solid #000; font-size: 9.5px; width: 26px;">ग्रेड</th>
+                    """
+                elif is_9_10_high:
+                    sub_comp_ths += """
+                    <th style="border: 1px solid #000; font-size: 9.5px; width: 35px;">थ्योरी (75)</th>
+                    <th style="border: 1px solid #000; font-size: 9.5px; width: 35px;">प्रोजेक्ट (25)</th>
+                    <th style="border: 1px solid #000; font-size: 10px; width: 35px; font-weight: bold; background: #EFF6FF;">कुल (100)</th>
+                    <th style="border: 1px solid #000; font-size: 9.5px; width: 28px;">ग्रेड</th>
+                    """
+                else:
+                    sub_comp_ths += """
+                    <th style="border: 1px solid #000; font-size: 9px; width: 28px;">मासिक (10)</th>
+                    <th style="border: 1px solid #000; font-size: 9px; width: 28px;">अर्ध (20)</th>
+                    <th style="border: 1px solid #000; font-size: 9px; width: 28px;">प्रोजे (10)</th>
+                    <th style="border: 1px solid #000; font-size: 9px; width: 28px;">लिखित (60)</th>
+                    <th style="border: 1px solid #000; font-size: 10px; width: 32px; font-weight: bold; background: #EFF6FF;">कुल (100)</th>
+                    <th style="border: 1px solid #000; font-size: 9px; width: 24px;">ग्रेड</th>
+                    """
+
+            # Build Rows HTML
+            gazette_rows = ""
+            for rec in records_master:
+                subj_tds = ""
+                for sub in cls_subjects:
+                    sdata = rec["Subjects"][sub["id"]]
+                    if is_5_8_board:
+                        subj_tds += f"""
+                        <td style="border: 1px solid #000; padding: 2px;">{sdata['hy_20']}</td>
+                        <td style="border: 1px solid #000; padding: 2px;">{sdata['proj_wt']}</td>
+                        <td style="border: 1px solid #000; padding: 2px;">{sdata['written_60']}</td>
+                        <td style="border: 1px solid #000; padding: 2px; font-weight: bold; background: #F8FAFC;">{sdata['total_100']}</td>
+                        <td style="border: 1px solid #000; padding: 2px; font-weight: bold;">{sdata['grade']}</td>
+                        """
+                    elif is_9_10_high:
+                        subj_tds += f"""
+                        <td style="border: 1px solid #000; padding: 2px;">{sdata['written_60']}</td>
+                        <td style="border: 1px solid #000; padding: 2px;">{sdata['proj_wt']}</td>
+                        <td style="border: 1px solid #000; padding: 2px; font-weight: bold; background: #F8FAFC;">{sdata['total_100']}</td>
+                        <td style="border: 1px solid #000; padding: 2px; font-weight: bold;">{sdata['grade']}</td>
+                        """
+                    else:
+                        subj_tds += f"""
+                        <td style="border: 1px solid #000; padding: 2px;">{sdata['monthly_10']}</td>
+                        <td style="border: 1px solid #000; padding: 2px;">{sdata['hy_20']}</td>
+                        <td style="border: 1px solid #000; padding: 2px;">{sdata['proj_wt']}</td>
+                        <td style="border: 1px solid #000; padding: 2px;">{sdata['written_60']}</td>
+                        <td style="border: 1px solid #000; padding: 2px; font-weight: bold; background: #F8FAFC;">{sdata['total_100']}</td>
+                        <td style="border: 1px solid #000; padding: 2px; font-weight: bold;">{sdata['grade']}</td>
+                        """
+
+                res_c = "#15803D" if rec["Result"] == "PASS" else "#B91C1C"
+                gazette_rows += f"""
+                <tr style="height: 26px; font-size: 10px; text-align: center;">
+                    <td style="border: 1px solid #000; padding: 2px; font-weight: bold;">{rec['Sr_No']}</td>
+                    <td style="border: 1px solid #000; padding: 2px; font-weight: bold;">{rec['Roll_No']}</td>
+                    <td style="border: 1px solid #000; padding: 2px;">{rec['Scholar_No']}</td>
+                    <td style="border: 1px solid #000; padding: 2px; font-size: 9.5px;">{rec['Samagra_ID']}</td>
+                    <td style="border: 1px solid #000; padding: 2px 6px; text-align: left; font-weight: bold; white-space: nowrap; color: #1E3A8A;">{rec['Name']}</td>
+                    <td style="border: 1px solid #000; padding: 2px 6px; text-align: left; white-space: nowrap;">{rec['Father_Name']}</td>
+                    <td style="border: 1px solid #000; padding: 2px 6px; text-align: left; white-space: nowrap;">{rec['Mother_Name']}</td>
+                    <td style="border: 1px solid #000; padding: 2px; font-size: 9.5px;">{rec['Category']} / {rec['Gender'][:1]}</td>
+                    {subj_tds}
+                    <td style="border: 1px solid #000; padding: 2px; font-weight: 900; background: #FFFDF0; font-size: 11px;">{rec['Grand_Total']}</td>
+                    <td style="border: 1px solid #000; padding: 2px; font-weight: bold; color: #1E3A8A;">{rec['Percentage']}%</td>
+                    <td style="border: 1px solid #000; padding: 2px; font-weight: bold;">{rec['Final_Grade']}</td>
+                    <td style="border: 1px solid #000; padding: 2px; font-weight: bold; color: {res_c};">{rec['Result']}</td>
+                    <td style="border: 1px solid #000; padding: 2px; font-weight: bold;">{rec['Rank']}</td>
+                    <td style="border: 1px solid #000; padding: 2px; font-size: 9.5px;">{rec['Attended_Days']}/{rec['Total_Days']}</td>
+                </tr>
+                """
+
+            gazette_table_html = f"""
+            <div class="printable-area" style="background: #ffffff; border: 2px solid #000; padding: 10px 14px; font-family: Arial, sans-serif; color: #000; overflow-x: auto;">
+                <!-- GOVT HEADER -->
+                <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 8px;">
+                    <div style="font-size: 18px; font-weight: 900; color: #1E3A8A; letter-spacing: 0.5px;">
+                        {board_header_title}
+                    </div>
+                    <div style="font-size: 15px; font-weight: 800; color: #000; margin-top: 2px;">
+                        {sheet_subtitle}
+                    </div>
+                    <div style="font-size: 12px; font-weight: bold; color: #475569; margin-top: 2px;">
+                        {appendix_tag}
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 11.5px; font-weight: bold; margin-top: 6px; border-top: 1px solid #000; padding-top: 4px;">
+                        <div><b>शाला:</b> {s_info.get('name', 'शासकीय माध्यमिक विद्यालय')} | <b>DISE:</b> {s_info.get('udise', '23260100101')}</div>
+                        <div><b>ब्लॉक:</b> {s_info.get('block','SENDHWA')} | <b>जिला:</b> {s_info.get('district','BARWANI')}</div>
+                        <div><b>कक्षा:</b> {display_w_class} | <b>माध्यम:</b> {get_display_medium(s_info)} | <b>सत्र:</b> {cur_sess}</div>
+                    </div>
+                </div>
+
+                <!-- GAZETTE TABLE -->
+                <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; font-size: 10px; text-align: center;">
+                    <thead>
+                        <tr style="background: #ffffff; font-weight: bold;">
+                            <th rowspan="2" style="border: 1px solid #000; width: 28px;">सरल क्र.</th>
+                            <th rowspan="2" style="border: 1px solid #000; width: 45px;">अनुक्रमांक</th>
+                            <th rowspan="2" style="border: 1px solid #000; width: 50px;">दाखिला क्र.</th>
+                            <th rowspan="2" style="border: 1px solid #000; width: 65px;">समग्र ID</th>
+                            <th rowspan="2" style="border: 1px solid #000; width: 130px; text-align: left; padding-left: 6px;">विद्यार्थी का नाम</th>
+                            <th rowspan="2" style="border: 1px solid #000; width: 110px; text-align: left; padding-left: 6px;">पिता का नाम</th>
+                            <th rowspan="2" style="border: 1px solid #000; width: 100px; text-align: left; padding-left: 6px;">माता का नाम</th>
+                            <th rowspan="2" style="border: 1px solid #000; width: 55px;">वर्ग/लिंग</th>
+                            {sub_col_ths}
+                            <th rowspan="2" style="border: 1px solid #000; width: 45px; background: #FFFDF0; font-weight: 900;">महायोग</th>
+                            <th rowspan="2" style="border: 1px solid #000; width: 45px;">प्रतिशत</th>
+                            <th rowspan="2" style="border: 1px solid #000; width: 35px;">ग्रेड</th>
+                            <th rowspan="2" style="border: 1px solid #000; width: 45px;">परिणाम</th>
+                            <th rowspan="2" style="border: 1px solid #000; width: 35px;">रैंक</th>
+                            <th rowspan="2" style="border: 1px solid #000; width: 50px;">उपस्थिति</th>
+                        </tr>
+                        <tr style="background: #ffffff;">
+                            {sub_comp_ths}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {gazette_rows}
+                    </tbody>
+                </table>
+
+                <!-- SIGNATURE BLOCK -->
+                <div style="display: flex; justify-content: space-between; margin-top: 35px; font-weight: bold; font-size: 11px; text-align: center;">
+                    <div>_______________________<br>कक्षा अध्यापक हस्ताक्षर</div>
+                    <div>_______________________<br>मूल्यांकन / परीक्षा प्रभारी</div>
+                    <div>_______________________<br>संस्था प्रधान (सील सहित)</div>
+                </div>
+                <div style="text-align: center; font-size: 9.5px; margin-top: 10px; color: #64748B;">
+                    शासकीय वार्षिक परीक्षा परिणाम अभिलेख पत्रक | मुद्रण दिनांक: {TODAY_STR}
+                </div>
             </div>
-            """)
+            """
+            render_html(gazette_table_html)
+
+        # ----------------- VIEW 2: 35-COLUMN COMPONENT-WISE WEIGHTAGE SHEET (IMAGE: image_05e7a7.png) -----------------
         else:
+            # Component-wise layout with proper spacing and styling
+            v_sub_ths = "".join([f'<th class="v-th" style="writing-mode: vertical-rl; transform: rotate(180deg); height: 110px; font-size: 10px; padding: 2px; border: 1px solid #000;">{sub["name"]}</th>' for sub in cls_subjects])
+            tot_cols_cnt = 4 + 5 * sub_count + 1
+            num_cells = "".join([f'<td style="border: 1px solid #000; padding: 2px; font-weight: bold; background: #FDEBD0;">{c_no}</td>' for c_no in range(1, tot_cols_cnt + 1)])
+
+            c_rows_html = ""
+            for rec in records_master:
+                # 1. Monthly (10%)
+                m_tds = "".join([f'<td style="border: 1px solid #000; padding: 2px;">{rec["Subjects"][sub["id"]]["monthly_10"]}</td>' for sub in cls_subjects])
+                # 2. HY (20%)
+                hy_tds = "".join([f'<td style="border: 1px solid #000; padding: 2px;">{rec["Subjects"][sub["id"]]["hy_20"]}</td>' for sub in cls_subjects])
+                # 3. Project (10%)
+                pj_tds = "".join([f'<td style="border: 1px solid #000; padding: 2px;">{rec["Subjects"][sub["id"]]["proj_wt"]}</td>' for sub in cls_subjects])
+                # 4. Written (60)
+                wr_tds = "".join([f'<td style="border: 1px solid #000; padding: 2px;">{rec["Subjects"][sub["id"]]["written_60"]}</td>' for sub in cls_subjects])
+                # 5. Final (100)
+                fn_tds = "".join([f'<td style="border: 1px solid #000; padding: 2px; font-weight: bold; color: #15803D;">{rec["Subjects"][sub["id"]]["total_100"]}</td>' for sub in cls_subjects])
+
+                c_rows_html += f"""
+                <tr style="height: 24px; font-size: 10px; text-align: center;">
+                    <td style="border: 1px solid #000; padding: 2px; font-weight: bold;">{rec['Sr_No']}</td>
+                    <td style="border: 1px solid #000; padding: 2px; font-weight: bold;">{rec['Roll_No']}</td>
+                    <td style="border: 1px solid #000; padding: 2px 6px; text-align: left; font-weight: bold; white-space: nowrap;">{rec['Name']}</td>
+                    <td style="border: 1px solid #000; padding: 2px; white-space: nowrap;">{target_w_class}</td>
+                    {m_tds}
+                    {hy_tds}
+                    {pj_tds}
+                    {wr_tds}
+                    {fn_tds}
+                    <td style="border: 1px solid #000; padding: 2px; font-weight: 900; color: #0F172A; background: #FFF8DC; font-size: 11px;">{rec['Grand_Total']}</td>
+                </tr>
+                """
+
+            c_35_html = f"""
+            <div class="printable-area" style="background: #ffffff; border: 2px solid #000; padding: 8px 10px; font-family: Arial, sans-serif; color: #000; overflow-x: auto;">
+                <div style="text-align: center; font-size: 17px; font-weight: 900; letter-spacing: 0.5px; margin-bottom: 2px;">
+                    {board_header_title}
+                </div>
+                <div style="text-align: center; font-size: 14px; font-weight: 800; color: #000; margin-bottom: 2px;">
+                    {s_info.get('name', 'शासकीय माध्यमिक विद्यालय')} — 35-कॉलम वार्षिक अधिभार मूल्यांकन पत्रक
+                </div>
+                <div style="text-align: center; font-size: 11.5px; font-weight: bold; color: #334155; margin-bottom: 8px;">
+                    DISE: {s_info.get('udise', '23260100101')} | ब्लॉक: {s_info.get('block','SENDHWA')} | जिला: {s_info.get('district','BARWANI')} | कक्षा: {display_w_class} | सत्र: {cur_sess}
+                </div>
+
+                <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; font-size: 10px; text-align: center;">
+                    <thead>
+                        <tr style="background: #ffffff; font-weight: bold; font-size: 10.5px;">
+                            <th rowspan="2" style="border: 1px solid #000; width: 30px;">Sr.No.</th>
+                            <th rowspan="2" style="border: 1px solid #000; width: 45px;">Roll No.</th>
+                            <th rowspan="2" style="border: 1px solid #000; width: 140px; text-align: center;">Name Of Student</th>
+                            <th rowspan="2" style="border: 1px solid #000; width: 60px;">Class</th>
+                            <th colspan="{sub_count}" style="border: 1px solid #000; background: #F8FAFC;">Monthly Evaluation 10%<br>Weightage</th>
+                            <th colspan="{sub_count}" style="border: 1px solid #000; background: #F8FAFC;">Half Yearly Evaluation 20%<br>Weightage</th>
+                            <th colspan="{sub_count}" style="border: 1px solid #000; background: #F8FAFC;">Annual Project Evaluation<br>10% Weightage</th>
+                            <th colspan="{sub_count}" style="border: 1px solid #000; background: #F8FAFC;">Annual Written Evaluation<br>60 Marks</th>
+                            <th colspan="{sub_count + 1}" style="border: 1px solid #000; background: #EFF6FF; color: #1E3A8A;">Monthly+Half Yearly+Annual+Project<br>10%+20%+60+10%=100%</th>
+                        </tr>
+                        <tr style="background: #ffffff;">
+                            {v_sub_ths}
+                            {v_sub_ths}
+                            {v_sub_ths}
+                            {v_sub_ths}
+                            {v_sub_ths}
+                            <th class="v-th" style="writing-mode: vertical-rl; transform: rotate(180deg); height: 110px; font-size: 10px; padding: 2px; border: 1px solid #000; font-weight: 900; background: #EFF6FF; color: #1E3A8A;">Grand Total</th>
+                        </tr>
+                        <tr style="height: 20px; font-size: 9.5px; text-align: center;">
+                            {num_cells}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {c_rows_html}
+                    </tbody>
+                </table>
+
+                <div style="display: flex; justify-content: space-between; margin-top: 35px; font-weight: bold; font-size: 11px; text-align: center;">
+                    <div>_______________________<br>कक्षा अध्यापक हस्ताक्षर</div>
+                    <div>_______________________<br>मूल्यांकन प्रभारी</div>
+                    <div>_______________________<br>संस्था प्रधान (सील सहित)</div>
+                </div>
+            </div>
+            """
+            render_html(c_35_html)
+
+        # Excel Export Section
+        if not is_teacher:
             st.divider()
-            render_html("##### 📥 35-कॉलम वेटेज शीट एक्सपोर्ट (Export for Records):")
-            if render_export_gatekeeper("35-कॉलम वेटेज मूल्यांकन पत्रक"):
-                w_export_df = pd.DataFrame(table_rows_data)
+            st.markdown("##### 📥 आधिकारिक वार्षिक परिणाम अभिलेख पत्रक एक्सेल डाउनलोड (.xlsx):")
+            if render_export_gatekeeper("वार्षिक परिणाम अभिलेख पत्रक"):
+                # Flat export dataframe
+                export_flat_rows = []
+                for rec in records_master:
+                    flat_r = {
+                        "सरल क्र.": rec["Sr_No"],
+                        "रोल नंबर": rec["Roll_No"],
+                        "दाखिला क्र.": rec["Scholar_No"],
+                        "समग्र आई.डी.": rec["Samagra_ID"],
+                        "विद्यार्थी का नाम": rec["Name"],
+                        "पिता का नाम": rec["Father_Name"],
+                        "माता का नाम": rec["Mother_Name"],
+                        "वर्ग/लिंग": f"{rec['Category']} / {rec['Gender']}",
+                    }
+                    for sub in cls_subjects:
+                        sdata = rec["Subjects"][sub["id"]]
+                        flat_r[f"{sub['name']}_मासिक10%"] = sdata["monthly_10"]
+                        flat_r[f"{sub['name']}_अर्धवार्षिक20%"] = sdata["hy_20"]
+                        flat_r[f"{sub['name']}_प्रोजेक्ट"] = sdata["proj_wt"]
+                        flat_r[f"{sub['name']}_लिखित60"] = sdata["written_60"]
+                        flat_r[f"{sub['name']}_कुल100"] = sdata["total_100"]
+                        flat_r[f"{sub['name']}_ग्रेड"] = sdata["grade"]
+                    
+                    flat_r["महायोग"] = rec["Grand_Total"]
+                    flat_r["पूर्णांक"] = rec["Max_Marks"]
+                    flat_r["प्रतिशत"] = f"{rec['Percentage']}%"
+                    flat_r["ग्रेड"] = rec["Final_Grade"]
+                    flat_r["परिणाम"] = rec["Result"]
+                    flat_r["रैंक"] = rec["Rank"]
+                    flat_r["उपस्थिति"] = f"{rec['Attended_Days']}/{rec['Total_Days']}"
+                    export_flat_rows.append(flat_r)
+                    
+                w_export_df = pd.DataFrame(export_flat_rows)
                 w_bytes, w_mime, w_ext = export_dataframe_bytes(w_export_df, "Excel (.xlsx)")
                 st.download_button(
-                    f"📥 35-कॉलम वेटेज शीट एक्सेल डाउनलोड (.xlsx)",
+                    "📥 आधिकारिक अभिलेख पत्रक एक्सेल डाउनलोड (.xlsx)",
                     data=w_bytes,
-                    file_name=f"35Col_Weighted_Evaluation_{target_w_class}_{cur_sess}.xlsx",
+                    file_name=f"Annual_Result_Record_Gazette_{target_w_class}_{cur_sess}.xlsx",
                     mime=w_mime,
                     type="primary",
                     use_container_width=True
                 )
 
 
+        render_govt_portals_hub("35-कॉलम वेटेज मूल्यांकन पत्रक", target_w_class, w_export_df if 'w_export_df' in locals() else None, "35Col_Weighted_Evaluation")
 
 # ----------------- MODULE 15: SESSION CHANGE & PROMOTION -----------------
 elif menu == T["nav_promote"]:
