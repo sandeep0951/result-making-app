@@ -1,0 +1,2 @@
+fonts-deva
+fonts-noto-core
