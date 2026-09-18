@@ -410,17 +410,16 @@ def generate_master_44col_df(students_df, evaluations, cls_subjects, school_info
 TODAY_STR = datetime.now().strftime("%d %B %Y")
 
 # ----------------- CUSTOM CSS FOR BEAUTIFUL UI, DEVANAGARI FONTS & PRINTING (A4 & A3) -----------------
-st.markdown("""
+render_html("""
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;600;700;800;900&display=swap');
-    
-    /* Apply Devanagari font cleanly to text elements without breaking Streamlit icon fonts */
+    /* Universal Devanagari Hindi font enforcement preventing Tofu squares */
     html, body, [data-testid="stAppViewContainer"], [data-testid="stHeader"], [data-testid="stSidebar"], .stMarkdown, p, h1, h2, h3, h4, h5, h6, label, input, select, textarea, table, th, td {
-        font-family: 'Noto Sans Devanagari', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+        font-family: 'Noto Sans Devanagari', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
     }
-    
-    /* CRITICAL FIX: Protect Streamlit Material Symbols / Icon ligatures from being overridden */
-    /* When generic 'span' or '*' has font-family overridden, icon ligatures like 'arrow_right' or 'upload' become raw text and overlap */
+    /* Protect Streamlit icon ligatures so symbols like arrow_right or upload don't become text and overlap */
     [data-testid*="Icon"], [class*="material-symbols"], [class*="material-icons"], span[translate="no"], i, svg {
         font-family: 'Material Symbols Rounded', 'Material Icons', sans-serif !important;
         font-style: normal;
@@ -430,15 +429,6 @@ st.markdown("""
         white-space: nowrap;
         word-wrap: normal;
         direction: ltr;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-render_html("""
-<style>
-    /* Secondary fallback for HTML blocks */
-    html, body, div, span, table, th, td {
-        font-family: 'Noto Sans Devanagari', sans-serif !important;
     }
     .main-header {
         font-size: 25px;
@@ -1079,16 +1069,15 @@ I18N = {
         "nav_eval": "📝 4. परीक्षा एवं गतिविधि मूल्यांकन (Evaluation Entry)",
         "nav_viewer": "🔍 5. छात्र संपूर्ण डेटा समीक्षा (Student Data Viewer)",
         "nav_monthly_test": "📝 6. मासिक मूल्यांकन रजिस्टर (Monthly Test — 10 अंक)",
-        "nav_quarterly": "📑 7. त्रैमासिक परीक्षा मूल्यांकन (Quarterly Exam — MPBSE 5% अधिभार)",
-        "nav_half_yearly": "📑 8. अर्धवार्षिक परीक्षा मूल्यांकन (Half-Yearly Exam — 20%/5% अधिभार)",
-        "nav_project": "🎨 9. वार्षिक प्रोजेक्ट कार्य मूल्यांकन (Project Work — 10%/15/20 अंक)",
-        "nav_marksheet": "🖨️ 10. शासकीय वार्षिक प्रगति पत्रक एवं RSKMP/MPBSE पोर्टल केंद्र",
-        "nav_a3_result": "📜 11. A3 वार्षिक परीक्षाफल पत्रक (Annual Result Sheet)",
-        "nav_summary": "📊 12. श्रेणीवार परीक्षा परिणाम सारांश (Result Summary)",
-        "nav_merit": "🏆 13. वार्षिक परीक्षा प्रावीण्य सूची (Merit List)",
-        "nav_supple": "📋 14. पूरक परीक्षा छात्र सूची (Supplementary List)",
-        "nav_weighted": "📑 15. वार्षिक परीक्षा परिणाम अभिलेख पत्रक (RSKMP व MPBSE प्रारूप)",
-        "nav_promote": "🔄 16. सत्र परिवर्तन एवं कक्षा पदोन्नति (Session Promotion)",
+        "nav_half_yearly": "📑 7. अर्धवार्षिक परीक्षा मूल्यांकन (Half-Yearly Exam — 20% अधिभार)",
+        "nav_project": "🎨 8. वार्षिक प्रोजेक्ट कार्य मूल्यांकन (Project Work — 10%/20 अंक)",
+        "nav_marksheet": "🖨️ 9. शासकीय वार्षिक प्रगति पत्रक एवं RSKMP/MPBSE पोर्टल केंद्र",
+        "nav_a3_result": "📜 10. A3 वार्षिक परीक्षाफल पत्रक (Annual Result Sheet)",
+        "nav_summary": "📊 11. श्रेणीवार परीक्षा परिणाम सारांश (Result Summary)",
+        "nav_merit": "🏆 12. वार्षिक परीक्षा प्रावीण्य सूची (Merit List)",
+        "nav_supple": "📋 13. पूरक परीक्षा छात्र सूची (Supplementary List)",
+        "nav_weighted": "📑 14. वार्षिक परीक्षा परिणाम अभिलेख पत्रक (RSKMP व MPBSE प्रारूप)",
+        "nav_promote": "🔄 15. सत्र परिवर्तन एवं कक्षा पदोन्नति (Session Promotion)",
         "backup_restore": "💾 बैकअप एवं रीस्टोर (Backup / Restore)",
         "download_backup": "📥 बैकअप फ़ाइल डाउनलोड करें (JSON)",
         "restore_backup": "📂 बैकअप से रीस्टोर करें",
@@ -1112,16 +1101,15 @@ I18N = {
         "nav_eval": "📝 4. Marks & Activity Evaluation",
         "nav_viewer": "🔍 5. Student Complete Data Viewer",
         "nav_monthly_test": "📝 6. Monthly Test Evaluation (10 Marks)",
-        "nav_quarterly": "📑 7. Quarterly Examination (Quarterly Exam — MPBSE 5% Weightage)",
-        "nav_half_yearly": "📑 8. Half-Yearly Examination (Half-Yearly Exam — 20%/5% Weightage)",
-        "nav_project": "🎨 9. Annual Project Work Evaluation",
-        "nav_marksheet": "🖨️ 10. Govt Holistic Progress Card & RSKMP/MPBSE Portal Center",
-        "nav_a3_result": "📜 11. A3 Annual Result Sheet",
-        "nav_summary": "📊 12. Category/Grade Wise Result Summary",
-        "nav_merit": "🏆 13. Annual Result Merit List",
-        "nav_supple": "📋 14. Supplementary Students List",
-        "nav_weighted": "📑 15. Annual Result Record Sheet (RSKMP & MPBSE Format)",
-        "nav_promote": "🔄 16. Session Roll-over & Promotion",
+        "nav_half_yearly": "📑 7. Half-Yearly Examination (20% Weightage)",
+        "nav_project": "🎨 8. Annual Project Work Evaluation",
+        "nav_marksheet": "🖨️ 9. Govt Holistic Progress Card & RSKMP/MPBSE Portal Center",
+        "nav_a3_result": "📜 10. A3 Annual Result Sheet",
+        "nav_summary": "📊 11. Category/Grade Wise Result Summary",
+        "nav_merit": "🏆 12. Annual Result Merit List",
+        "nav_supple": "📋 13. Supplementary Students List",
+        "nav_weighted": "📑 14. Annual Result Record Sheet (RSKMP & MPBSE Format)",
+        "nav_promote": "🔄 15. Session Roll-over & Promotion",
         "backup_restore": "💾 Backup & Restore",
         "download_backup": "📥 Download Backup File (JSON)",
         "restore_backup": "📂 Restore from Backup File",
@@ -1145,16 +1133,15 @@ I18N = {
         "nav_eval": "📝 4. परीक्षा व मूल्यमापन (Evaluation Entry)",
         "nav_viewer": "🔍 5. विद्यार्थी संपूर्ण माहिती दर्शक (Student Data Viewer)",
         "nav_monthly_test": "📝 6. मासिक मूल्यमापन नोंदवही (Monthly Test — 10 गुण)",
-        "nav_quarterly": "📑 7. त्रैमासिक परीक्षा मूल्यमापन (Quarterly Exam — 5% भारांश)",
-        "nav_half_yearly": "📑 8. सत्रांत / सहामाही परीक्षा मूल्यमापन (20%/5% भारांश)",
-        "nav_project": "🎨 9. वार्षिक प्रकल्प कार्य मूल्यमापन (Project Work)",
-        "nav_marksheet": "🖨️ 10. शासकीय प्रगती पत्रक व RSKMP/MPBSE पोर्टल केंद्र",
-        "nav_a3_result": "📜 11. A3 वार्षिक निकाल पत्रक (Annual Result Sheet)",
-        "nav_summary": "📊 12. प्रवर्गनिहाय निकाल गोषवारा (Result Summary)",
-        "nav_merit": "🏆 13. वार्षिक परीक्षा गुणवत्ता यादी (Merit List)",
-        "nav_supple": "📋 14. पुरवणी परीक्षा विद्यार्थी यादी (Supplementary List)",
-        "nav_weighted": "📑 15. वार्षिक निकाल अभिलेख पत्रक (RSKMP व MPBSE प्रारूप)",
-        "nav_promote": "🔄 16. सत्र बदल व वर्ग पदोन्नती (Promotion)",
+        "nav_half_yearly": "📑 7. सत्रांत / सहामाही परीक्षा मूल्यमापन (20% भारांश)",
+        "nav_project": "🎨 8. वार्षिक प्रकल्प कार्य मूल्यमापन (Project Work)",
+        "nav_marksheet": "🖨️ 9. शासकीय प्रगती पत्रक व RSKMP/MPBSE पोर्टल केंद्र",
+        "nav_a3_result": "📜 10. A3 वार्षिक निकाल पत्रक (Annual Result Sheet)",
+        "nav_summary": "📊 11. प्रवर्गनिहाय निकाल गोषवारा (Result Summary)",
+        "nav_merit": "🏆 12. वार्षिक परीक्षा गुणवत्ता यादी (Merit List)",
+        "nav_supple": "📋 13. पुरवणी परीक्षा विद्यार्थी यादी (Supplementary List)",
+        "nav_weighted": "📑 14. वार्षिक निकाल अभिलेख पत्रक (RSKMP व MPBSE प्रारूप)",
+        "nav_promote": "🔄 15. सत्र बदल व वर्ग पदोन्नती (Promotion)",
         "backup_restore": "💾 बॅकअप आणि पुनर्संचयित (Backup/Restore)",
         "download_backup": "📥 बॅकअप फाईल डाउनलोड करा (JSON)",
         "restore_backup": "📂 बॅकअपमधून पुनर्संचयित करा",
@@ -1266,7 +1253,7 @@ def get_class_subjects(cls_name):
             {"id": "sub4", "name": "विषय 4 (Chemistry / Business / Arts)", "code": "04"},
             {"id": "sub5", "name": "विषय 5 (Maths / Bio / Economics)", "code": "05"}
         ]
-    # RSKMP/MPBSE Compliance Fix: Check Class 9th & 10th prior to Class 1st & 2nd to prevent substring collision
+    # MPBSE 10th Check placed first to avoid 'class 1' substring collision
     elif any(k in clean for k in ["class 9", "class 10", "9th", "10th", "कक्षा 9", "कक्षा 10"]):
         return [
             {"id": "hindi", "name": "Hindi (प्रथम भाषा)", "code": "01"},
@@ -1291,12 +1278,12 @@ def get_class_subjects(cls_name):
         ]
     else:
         return [
-            {"id": "hindi", "name": "Hindi (हिन्दी)", "code": "01"},
-            {"id": "english", "name": "English (अंग्रेजी)", "code": "02"},
+            {"id": "hindi", "name": "Hindi", "code": "01"},
+            {"id": "english", "name": "English", "code": "02"},
             {"id": "sanskrit", "name": "Sanskrit / तृतीय भाषा", "code": "03"},
-            {"id": "maths", "name": "Mathematics (गणित)", "code": "04"},
-            {"id": "science", "name": "Science (विज्ञान)", "code": "05"},
-            {"id": "social_science", "name": "Social Science (सामाजिक विज्ञान)", "code": "06"}
+            {"id": "maths", "name": "Mathematics", "code": "04"},
+            {"id": "science", "name": "Science", "code": "05"},
+            {"id": "social_science", "name": "Social Science", "code": "06"}
         ]
 
 CO_CURRICULAR_ACTIVITIES = [
@@ -2189,7 +2176,6 @@ with st.sidebar:
             T["nav_eval"],
             T["nav_viewer"],
             T["nav_monthly_test"],
-            T["nav_quarterly"],
             T["nav_half_yearly"],
             T["nav_project"],
             T["nav_marksheet"],
@@ -3291,7 +3277,26 @@ elif menu == T["nav_eval"]:
                 p_proj_val = prev_sub.get("project", 18)
                 p_yr_val = prev_sub.get("annual", 48)
 
-                if has_proj_m4:
+                clean_m4_c = str(selected_class).lower()
+                is_m4_10 = any(k in clean_m4_c for k in ["class 9", "class 10", "9th", "10th", "कक्षा 9", "कक्षा 10"])
+                if is_m4_10:
+                    # MPBSE 10th: Quarterly(5) + HalfYearly(5) + Project(15) = 25 IA + 75 Annual Written = 100
+                    p_q_val = prev_sub.get("quarterly", 55)
+                    r_cols = st.columns([2.5, 1.5, 1.5, 1.5, 2, 1.5, 1.5])
+                    with r_cols[0]: st.write(f"📖 **{s_name}**")
+                    with r_cols[1]: val_q = st.number_input(f"त्रैमासिक (75)", min_value=0, max_value=75, value=min(75, max(0, int(p_q_val))), key=f"num_q_{selected_class}_{sel_roll}_{s_id}")
+                    with r_cols[2]: val_hy = st.number_input(f"छमाही (75)", min_value=0, max_value=75, value=min(75, max(0, int(p_hy_val))), key=f"num_hy_{selected_class}_{sel_roll}_{s_id}")
+                    with r_cols[3]: val_proj = st.number_input(f"प्रोजेक्ट (15)", min_value=0, max_value=15, value=min(15, max(0, int(p_proj_val))), key=f"num_proj_{selected_class}_{sel_roll}_{s_id}")
+                    with r_cols[4]: val_yr = st.number_input(f"वार्षिक बोर्ड (75)", min_value=0, max_value=75, value=min(75, max(0, int(p_yr_val))), key=f"num_yr_{selected_class}_{sel_roll}_{s_id}")
+                    w_q = calculate_subject_quarterly_weightage(val_q, 75)
+                    w_hy = calculate_subject_quarterly_weightage(val_hy, 75)
+                    m_ia = w_q + w_hy + val_proj
+                    m_tot = m_ia + val_yr if st_overall_status != "Absent" else 0
+                    m_grd = calculate_grade(m_tot) if st_overall_status != "Absent" else "Ab"
+                    with r_cols[5]: st.markdown(f"**आंतरिक:** `{m_ia}/25`<br><small>Q:{w_q} H:{w_hy} P:{val_proj}</small>", unsafe_allow_html=True)
+                    with r_cols[6]: st.markdown(f"**कुल:** `{m_tot}/100`<br>**ग्रेड:** `{m_grd}`", unsafe_allow_html=True)
+                    updated_marks[s_id] = {"quarterly": val_q, "quarterly_5%": w_q, "half_yearly": val_hy, "half_yearly_5%": w_hy, "project": val_proj, "annual": val_yr, "total": m_tot, "grade": m_grd}
+                elif has_proj_m4:
                     r_cols = st.columns([3, 2, 2, 2, 2, 2])
                     with r_cols[0]: st.write(f"📖 **{s_name}**")
                     with r_cols[1]: val_hy = st.number_input(f"अर्धवार्षिक (20)", min_value=0, max_value=20, value=min(20, max(0, int(p_hy_val))), key=f"num_hy_{selected_class}_{sel_roll}_{s_id}")
@@ -3515,118 +3520,11 @@ elif menu == T.get("nav_monthly_test", "📝 6. मासिक मूल्य�
             st.success("✅ मासिक अंक सुरक्षित एवं अधिभार अपडेट!")
             st.rerun()
 
-# ----------------- MODULE 7: QUARTERLY EXAMINATION (MPBSE 5% WEIGHTAGE) -----------------
-elif menu == T.get("nav_quarterly", "📑 7. त्रैमासिक परीक्षा मूल्यांकन (Quarterly Exam — MPBSE 5% अधिभार)"):
-    clean_qcls = str(selected_class).lower().strip()
-    is_9_or_10 = any(k in clean_qcls for k in ["class 9", "class 10", "9th", "10th", "कक्षा 9", "कक्षा 10"])
-
-    st.markdown('<div class="main-header">📑 त्रैमासिक परीक्षा मूल्यांकन पंजी (Quarterly Exam)</div>', unsafe_allow_html=True)
-    
-    if is_9_or_10:
-        st.info("💡 **MPBSE हाईस्कूल (कक्षा 9वीं व 10वीं) शासकीय नियम:** 75 अंक सैद्धांतिक बोर्ड परीक्षा + 25 अंक आंतरिक मूल्यांकन। आंतरिक मूल्यांकन के 25 अंकों में **त्रैमासिक परीक्षा के प्राप्तांक का 5% अधिभार (अधिकतम 05 अंक)**, **अर्धवार्षिक परीक्षा का 5% अधिभार (अधिकतम 05 अंक)**, एवं **प्रायोजना कार्य / प्रैक्टिकल के 15 अंक** सम्मिलित होते हैं (5 + 5 + 15 = 25 अंक)।")
-    else:
-        st.info("💡 **त्रैमासिक परीक्षा मूल्यांकन:** यहाँ विद्यार्थियों के त्रैमासिक परीक्षा के विषयवार प्राप्तांक दर्ज किए जाते हैं तथा निर्धारित अधिभार की स्वतः गणना होती है।")
-
-    q_cls_data = get_class_data(selected_class)
-    students_df = q_cls_data["students"]
-    cls_subjects = get_class_subjects(selected_class)
-    q_evals = q_cls_data["evaluations"]
-
-    if students_df.empty:
-        st.warning("⚠️ कक्षा में कोई विद्यार्थी पंजीकृत नहीं है।")
-    else:
-        col_q1, col_q2 = st.columns([2, 2])
-        with col_q1:
-            q_max_marks = st.selectbox(
-                "त्रैमासिक परीक्षा पूर्णांक (Max Marks per Subject):",
-                [75, 100, 50],
-                index=0 if is_9_or_10 else 1,
-                help="MPBSE बोर्ड परीक्षा प्रारूप हेतु सामान्यतः 75 अंक का प्रश्नपत्र होता है।"
-            )
-        with col_q2:
-            st.markdown(f"**निर्धारित आंतरिक अधिभार:** `5% (अधिकतम 05 अंक प्रति विषय)`")
-
-        q_rows = []
-        for _, s in students_df.iterrows():
-            r = s["Roll_No"]
-            ev = q_evals.get(r, {})
-            m_dict = ev.get("marks", {})
-            row = {"Roll_No": r, "Name": s["Name"]}
-            for sub in cls_subjects:
-                raw_q = m_dict.get(sub["id"], {}).get("quarterly", int(q_max_marks * 0.70))
-                w_5 = calculate_subject_quarterly_weightage(raw_q, q_max_marks)
-                row[sub["name"]] = int(raw_q)
-                row[f"{sub['name']}_5%"] = w_5
-            q_rows.append(row)
-
-        edited_q = st.data_editor(pd.DataFrame(q_rows), use_container_width=True, key=f"q_ed_{selected_class}")
-        
-        c_qs1, c_qs2 = st.columns([3, 1])
-        with c_qs1:
-            if st.button("💾 त्रैमासिक अंक सुरक्षित करें", type="primary"):
-                for _, erow in edited_q.iterrows():
-                    r = erow["Roll_No"]
-                    if r not in q_evals: q_evals[r] = {"marks": {}}
-                    if "marks" not in q_evals[r]: q_evals[r]["marks"] = {}
-                    for sub in cls_subjects:
-                        if sub["id"] not in q_evals[r]["marks"]: q_evals[r]["marks"][sub["id"]] = {}
-                        raw_val = int(erow[sub["name"]])
-                        q_evals[r]["marks"][sub["id"]]["quarterly"] = raw_val
-                        q_evals[r]["marks"][sub["id"]]["quarterly_5%"] = calculate_subject_quarterly_weightage(raw_val, q_max_marks)
-                save_data_to_disk()
-                st.success("✅ त्रैमासिक प्राप्तांक एवं 5% अधिभार सुरक्षित कर दिए गए!")
-                st.rerun()
-
-        # MPBSE 25-Marks Internal Assessment Consolidated Summary for High School (Class 9 & 10)
-        if is_9_or_10:
-            st.divider()
-            st.subheader("🎯 MPBSE 25-अंक आंतरिक मूल्यांकन कंसोलिडेटेड सारांश (Class 10th Internal Assessment)")
-            st.caption("यह तालिका त्रैमासिक (5) + अर्धवार्षिक (5) + प्रोजेक्ट (15) = कुल 25 अंक बोर्ड पोर्टल अपलोड हेतु स्वतः समेकित करती है।")
-            ia_rows = []
-            for _, s in students_df.iterrows():
-                r = s["Roll_No"]
-                ev = q_evals.get(r, {})
-                m_dict = ev.get("marks", {})
-                ia_row = {"Roll_No": r, "Scholar_No": s.get("Scholar_No", "--"), "Name": s["Name"]}
-                tot_ia = 0
-                for sub in cls_subjects:
-                    s_id = sub["id"]
-                    sub_m = m_dict.get(s_id, {})
-                    q_w = sub_m.get("quarterly_5%", calculate_subject_quarterly_weightage(sub_m.get("quarterly", int(q_max_marks*0.7)), q_max_marks))
-                    hy_raw = sub_m.get("half_yearly", int(q_max_marks*0.7))
-                    hy_w = calculate_subject_quarterly_weightage(hy_raw, q_max_marks)
-                    proj_raw = sub_m.get("project", 12)
-                    proj_15 = min(15, max(0, int(proj_raw)))
-                    sub_ia_total = q_w + hy_w + proj_15
-                    tot_ia += sub_ia_total
-                    ia_row[f"{sub['name']} [25]"] = f"{sub_ia_total} (Q:{q_w} H:{hy_w} P:{proj_15})"
-                ia_row["कुल आंतरिक अंक [150]"] = tot_ia
-                ia_row["औसत IA %"] = round((tot_ia / (len(cls_subjects)*25)) * 100, 1) if cls_subjects else 0
-                ia_rows.append(ia_row)
-            
-            ia_df = pd.DataFrame(ia_rows)
-            st.dataframe(ia_df, use_container_width=True)
-            
-            csv_ia = ia_df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-            st.download_button(
-                "📥 MPBSE आंतरिक मूल्यांकन (25 अंक) CSV डाउनलोड करें",
-                data=csv_ia,
-                file_name=f"MPBSE_{selected_class}_Internal_Assessment_25M_{st.session_state.school_info.get('session','2026-27')}.csv",
-                mime="text/csv"
-            )
-
-# ----------------- MODULE 8: HALF-YEARLY EXAMINATION -----------------
-elif menu == T.get("nav_half_yearly", "📑 8. अर्धवार्षिक परीक्षा मूल्यांकन (Half-Yearly Exam — 20%/5% अधिभार)"):
+# ----------------- MODULE 7: HALF-YEARLY EXAMINATION -----------------
+elif menu == T.get("nav_half_yearly", "📑 7. अर्धवार्षिक परीक्षा मूल्यांकन (Half-Yearly Exam — 20% अधिभार)"):
     st.markdown('<div class="main-header">📑 अर्धवार्षिक परीक्षा मूल्यांकन पंजी (20% अधिभार)</div>', unsafe_allow_html=True)
     # FIX: Clean plain text representation
-    clean_hcls = str(selected_class).lower().strip()
-    is_9_10_hy = any(k in clean_hcls for k in ["class 9", "class 10", "9th", "10th", "कक्षा 9", "कक्षा 10"])
-
-    if is_9_10_hy:
-        st.info("💡 **शासकीय नियम (MPBSE हाईस्कूल):** कक्षा 9वीं व 10वीं हेतु अर्धवार्षिक परीक्षा 75 अंक की होती है तथा आंतरिक मूल्यांकन हेतु 5% अधिभार (अधिकतम 05 अंक) की गणना की जाती है।")
-    else:
-        st.info("💡 **शासकीय नियम (RSKMP):** अर्धवार्षिक परीक्षा 60 अंक की होती है। 20% अधिभार हेतु (प्राप्तांक ÷ 3 = 20%) की गणना की जाती है।")
-
+    st.info("💡 **शासकीय नियम (RSKMP):** अर्धवार्षिक परीक्षा 60 अंक की होती है। 20% अधिभार हेतु (प्राप्तांक ÷ 3 = 20%) की गणना की जाती है।")
     hy_cls_data = get_class_data(selected_class)
     students_df = hy_cls_data["students"]
     cls_subjects = get_class_subjects(selected_class)
@@ -3642,12 +3540,9 @@ elif menu == T.get("nav_half_yearly", "📑 8. अर्धवार्षिक
             m_dict = ev.get("marks", {})
             row = {"Roll_No": r, "Name": s["Name"]}
             for sub in cls_subjects:
-                raw_m = m_dict.get(sub["id"], {}).get("half_yearly", 52 if is_9_10_hy else 48)
+                raw_m = m_dict.get(sub["id"], {}).get("half_yearly", 48)
                 row[sub["name"]] = int(raw_m)
-                if is_9_10_hy:
-                    row[f"{sub['name']}_5%"] = calculate_subject_quarterly_weightage(raw_m, 75)
-                else:
-                    row[f"{sub['name']}_20%"] = calculate_subject_half_yearly_weightage(raw_m, "60")
+                row[f"{sub['name']}_20%"] = calculate_subject_half_yearly_weightage(raw_m, "60")
             hy_rows.append(row)
 
         edited_hy = st.data_editor(pd.DataFrame(hy_rows), use_container_width=True, key=f"hy_ed_{selected_class}")
@@ -3663,8 +3558,8 @@ elif menu == T.get("nav_half_yearly", "📑 8. अर्धवार्षिक
             st.success("✅ अर्धवार्षिक प्राप्तांक व 20% अधिभार सुरक्षित!")
             st.rerun()
 
-# ----------------- MODULE 9: ANNUAL PROJECT WORK EVALUATION -----------------
-elif menu == T.get("nav_project", "🎨 9. वार्षिक प्रोजेक्ट कार्य मूल्यांकन (Project Work — 10%/15/20 अंक)"):
+# ----------------- MODULE 8: ANNUAL PROJECT WORK EVALUATION -----------------
+elif menu == T.get("nav_project", "🎨 8. वार्षिक प्रोजेक्ट कार्य मूल्यांकन (Project Work — 10%/20 अंक)"):
     st.markdown('<div class="main-header">🎨 वार्षिक प्रोजेक्ट कार्य मूल्यांकन पंजी</div>', unsafe_allow_html=True)
     # FIX: Clean plain text representation
     st.info("💡 **प्रोजेक्ट कार्य मूल्यांकन:** 5वीं व 8वीं बोर्ड हेतु 20 अंक तथा स्थानीय कक्षाओं हेतु 40 अंक (प्राप्तांक ÷ 4 = 10% अधिभार)।")
@@ -3701,135 +3596,231 @@ elif menu == T.get("nav_project", "🎨 9. वार्षिक प्रोज
             st.success("✅ प्रोजेक्ट अंक सुरक्षित एवं अधिभार अपडेट!")
             st.rerun()
 
-# ----------------- MODULE 10: PRINT MARKSHEET (SHASHKIY PRAGATI PATRAK) -----------------
-elif menu == T.get("nav_marksheet", "🖨️ 10. शासकीय वार्षिक प्रगति पत्रक एवं RSKMP/MPBSE पोर्टल केंद्र"):
+# ----------------- MODULE 9: PRINT MARKSHEET (SHASHKIY PRAGATI PATRAK) & PORTAL HUB -----------------
+elif menu == T.get("nav_marksheet", "🖨️ 9. शासकीय वार्षिक प्रगति पत्रक एवं RSKMP/MPBSE पोर्टल केंद्र"):
     s_info = st.session_state.school_info
     cur_sess = s_info.get("session", "2026-27")
     ms_cls_data = get_class_data(selected_class)
     students_df = ms_cls_data["students"]
     cls_subjects = get_class_subjects(selected_class)
 
-    st.markdown('<div class="main-header">🖨️ शासकीय समग्र प्रगति पत्रक एवं पोर्टल केंद्र</div>', unsafe_allow_html=True)
-    if students_df.empty:
-        st.warning("कक्षा में विद्यार्थी पंजीकृत नहीं हैं।")
+    st.markdown('<div class="main-header">🖨️ 9. शासकीय वार्षिक प्रगति पत्रक एवं RSKMP / MPBSE पोर्टल केंद्र</div>', unsafe_allow_html=True)
+    
+    clean_cls = str(selected_class).lower().strip()
+    is_9_10 = any(k in clean_cls for k in ["class 9", "class 10", "9th", "10th", "कक्षा 9", "कक्षा 10"])
+    
+    if is_9_10:
+        portal_export_df = generate_mpbse_df(students_df, ms_cls_data["evaluations"], cls_subjects, s_info, selected_class)
+        def_file_name = f"MPBSE_Class_{selected_class.replace(' ', '_')}_Board_Result"
+        portal_name = "माध्यमिक शिक्षा मण्डल (MPBSE)"
+        portal_url = "https://mpbse.mponline.gov.in"
     else:
-        st_names = [f"Roll {s['Roll_No']}: {s['Name']}" for _, s in students_df.iterrows()]
-        sel_st_str = st.selectbox("विद्यार्थी चुनें:", st_names)
-        sel_r = int(sel_st_str.split(":")[0].replace("Roll", "").strip())
-        stud = students_df[students_df["Roll_No"] == sel_r].iloc[0]
-        ev = ms_cls_data["evaluations"].get(sel_r, {})
-        m_dict = ev.get("marks", {})
+        portal_export_df = generate_rskmp_df(students_df, ms_cls_data["evaluations"], cls_subjects, s_info, selected_class)
+        def_file_name = f"RSKMP_Bulk_Upload_{selected_class.replace(' ', '_')}"
+        portal_name = "राज्य शिक्षा केंद्र (RSKMP)"
+        portal_url = "https://www.rskmp.in"
 
-        c_btn1, c_btn2 = st.columns([3, 1])
-        with c_btn2:
-            st.button("🖨️ Print Marksheet", type="primary", use_container_width=True)
+    # Two prominent top-level sub-tabs
+    tab_p1, tab_p2 = st.tabs([
+        "📥 1. शासकीय पोर्टल डाउनलोड एवं अपलोड केंद्र (RSKMP / MPBSE)",
+        "🖨️ 2. विद्यार्थी समग्र प्रगति पत्रक (Print Marksheet)"
+    ])
 
-        cur_exam_rule = get_session_exam_rule(cur_sess, selected_class)
-        has_proj_comp = any(c["id"] == "project" for c in cur_exam_rule["components"])
-
-        rows_h = ""
-        tot_marks = 0
-        if has_proj_comp:
-            for idx, sub in enumerate(cls_subjects):
-                se = m_dict.get(sub["id"], {})
-                hy = se.get("half_yearly", 16)
-                proj = se.get("project", 16)
-                yr = se.get("annual", 48)
-                t = se.get("total", hy + proj + yr)
-                g = se.get("grade", calculate_grade(t))
-                tot_marks += t
-                rows_h += f"<tr style='height:28px; text-align:center;'><td style='border:1px solid #000;'>{idx+1}</td><td style='border:1px solid #000; text-align:left; padding-left:8px;'><b>{sub['name']}</b></td><td style='border:1px solid #000;'>{hy}</td><td style='border:1px solid #000;'>{proj}</td><td style='border:1px solid #000;'>{yr}</td><td style='border:1px solid #000; font-weight:bold; color:#1E3A8A;'>{t}</td><td style='border:1px solid #000; font-weight:bold;'>{g}</td></tr>"
-
-            table_header_html = """
-                <tr style="background:#F1F5F9; height:30px; font-weight:bold; text-align:center;">
-                    <th style="border:1px solid #000; width:6%;">क्र.</th>
-                    <th style="border:1px solid #000; text-align:left; padding-left:8px;">विषय (Subject)</th>
-                    <th style="border:1px solid #000; width:15%;">अर्धवार्षिक [20]</th>
-                    <th style="border:1px solid #000; width:15%;">प्रोजेक्ट कार्य [20]</th>
-                    <th style="border:1px solid #000; width:18%;">वार्षिक लिखित [60]</th>
-                    <th style="border:1px solid #000; width:16%;">कुल [100]</th>
-                    <th style="border:1px solid #000; width:10%;">ग्रेड</th>
-                </tr>
-            """
-            grand_total_row = f"""
-                <tr style="background:#FFFDF0; height:32px; font-weight:bold; text-align:center; font-size:13px;">
-                    <td colspan="5" style="border:1px solid #000; text-align:right; padding-right:12px;">महायोग (Grand Total):</td>
-                    <td style="border:1px solid #000; color:#1E3A8A;">{tot_marks} / {len(cls_subjects) * 100}</td>
-                    <td style="border:1px solid #000; color:green;">{calculate_grade(round((tot_marks / (len(cls_subjects)*100))*100, 1) if cls_subjects else 0)}</td>
-                </tr>
-            """
-        else:
-            for idx, sub in enumerate(cls_subjects):
-                se = m_dict.get(sub["id"], {})
-                hy = se.get("half_yearly", 32)
-                yr = se.get("annual", 48)
-                t = se.get("total", hy + yr)
-                g = se.get("grade", calculate_grade(t))
-                tot_marks += t
-                rows_h += f"<tr style='height:28px; text-align:center;'><td style='border:1px solid #000;'>{idx+1}</td><td style='border:1px solid #000; text-align:left; padding-left:8px;'><b>{sub['name']}</b></td><td style='border:1px solid #000;'>{hy}</td><td style='border:1px solid #000;'>{yr}</td><td style='border:1px solid #000; font-weight:bold; color:#1E3A8A;'>{t}</td><td style='border:1px solid #000; font-weight:bold;'>{g}</td></tr>"
-
-            table_header_html = """
-                <tr style="background:#F1F5F9; height:30px; font-weight:bold; text-align:center;">
-                    <th style="border:1px solid #000; width:8%;">क्र.</th>
-                    <th style="border:1px solid #000; text-align:left; padding-left:8px;">विषय (Subject)</th>
-                    <th style="border:1px solid #000; width:18%;">अर्धवार्षिक [40]</th>
-                    <th style="border:1px solid #000; width:18%;">वार्षिक परीक्षा [60]</th>
-                    <th style="border:1px solid #000; width:18%;">कुल [100]</th>
-                    <th style="border:1px solid #000; width:12%;">ग्रेड</th>
-                </tr>
-            """
-            grand_total_row = f"""
-                <tr style="background:#FFFDF0; height:32px; font-weight:bold; text-align:center; font-size:13px;">
-                    <td colspan="4" style="border:1px solid #000; text-align:right; padding-right:12px;">महायोग (Grand Total):</td>
-                    <td style="border:1px solid #000; color:#1E3A8A;">{tot_marks} / {len(cls_subjects) * 100}</td>
-                    <td style="border:1px solid #000; color:green;">{calculate_grade(round((tot_marks / (len(cls_subjects)*100))*100, 1) if cls_subjects else 0)}</td>
-                </tr>
-            """
-
-        max_m = len(cls_subjects) * 100
-        pct = round((tot_marks / max_m) * 100, 1) if max_m else 0
-
-        marksheet_html = f"""
-        <div class="printable-area" style="background:#ffffff; border:3px double #1E3A8A; padding:20px; max-width:850px; margin:auto; color:#000;">
-            <div style="text-align:center; margin-bottom:15px;">
-                <div style="font-size:14px; font-weight:bold; color:#1E3A8A;">मध्य प्रदेश शासन • स्कूल शिक्षा विभाग</div>
-                <div style="font-size:22px; font-weight:900; color:#0F172A; text-transform:uppercase;">समग्र प्रगति पत्रक (Holistic Progress Card)</div>
-                <div style="font-size:16px; font-weight:bold; color:#1E3A8A;">{s_info.get('name','')}</div>
-                <div style="font-size:12px; color:#555;">DISE: {s_info.get('udise','')} | ब्लॉक: {s_info.get('block','')} | जिला: {s_info.get('district','')} | सत्र: {cur_sess}</div>
+    # ---------------- SUB-TAB 1: PORTAL DOWNLOAD & UPLOAD HUB ----------------
+    with tab_p1:
+        st.subheader(f"📥 {selected_class} — {portal_name} शासकीय डेटा डाउनलोड केंद्र")
+        
+        # DPDP Act 2023 & Student Data Privacy Statutory Warning
+        render_html('''
+        <div style="background: #FFFBEB; border-left: 5px solid #F59E0B; padding: 12px 16px; border-radius: 6px; margin-bottom: 14px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 18px;">⚠️</span>
+                <b style="color: #92400E; font-size: 13.5px;">विद्यार्थी व्यक्तिगत डेटा गोपनीयता एवं सुरक्षा वैधानिक सूचना (DPDP Act 2023 Compliance):</b>
             </div>
-            <table style="width:100%; border-collapse:collapse; border:1px solid #000; font-size:12px; margin-bottom:12px; background:#f8fafc;">
-                <tr>
-                    <td style="border:1px solid #000; padding:6px;"><b>विद्यार्थी का नाम:</b> {stud['Name']}</td>
-                    <td style="border:1px solid #000; padding:6px;"><b>अनुक्रमांक (Roll No):</b> <b style="color:#B91C1C; font-size:14px;">{stud['Roll_No']}</b></td>
-                </tr>
-                <tr>
-                    <td style="border:1px solid #000; padding:6px;"><b>पिता का नाम:</b> {stud['Father_Name']}</td>
-                    <td style="border:1px solid #000; padding:6px;"><b>दाखिला क्र. (Scholar):</b> {stud.get('Scholar_No','--')}</td>
-                </tr>
-                <tr>
-                    <td style="border:1px solid #000; padding:6px;"><b>माता का नाम:</b> {stud['Mother_Name']}</td>
-                    <td style="border:1px solid #000; padding:6px;"><b>समग्र आईडी:</b> {stud.get('SSSM_ID','--')}</td>
-                </tr>
-                <tr>
-                    <td style="border:1px solid #000; padding:6px;"><b>कक्षा व वर्ग:</b> {selected_class} - {stud.get('Section','A')}</td>
-                    <td style="border:1px solid #000; padding:6px;"><b>जन्मतिथि:</b> {stud.get('DOB','--')}</td>
-                </tr>
-            </table>
-            <table style="width:100%; border-collapse:collapse; border:1px solid #000; font-size:12px; margin-bottom:12px;">
-                {table_header_html}
-                {rows_h}
-                {grand_total_row}
-            </table>
-            <div style="display:flex; justify-content:space-between; margin-top:40px; text-align:center; font-size:12px; font-weight:bold;">
-                <div>_________________________<br>कक्षा अध्यापक हस्ताक्षर</div>
-                <div>_________________________<br>परीक्षा प्रभारी</div>
-                <div>_________________________<br>संस्था प्रधान (मुद्रा सहित)</div>
+            <div style="font-size: 12px; color: #78350F; margin-top: 5px; line-height: 1.5;">
+                • विद्यार्थियों का व्यक्तिगत डेटा (जैसे आधार संख्या, समग्र आईडी, जन्मतिथि, जाति एवं प्राप्तांक) कानूनी रूप से संरक्षित संवेदनशील डेटा है।<br>
+                • शासकीय नियमानुसार बल्क छात्र डेटा डाउनलोड करने का वैधानिक अधिकार केवल <b>संस्था प्रधान (Principal)</b> के अधिकृत खाते में निहित है।<br>
+                • संस्था प्रधान द्वारा किए गए प्रत्येक एक्सपोर्ट का डिजिटल सुरक्षा ऑडिट लॉग (दिनांक, समय, यूज़र एवं आईपी) दर्ज किया जाता है।
             </div>
         </div>
-        """
-        render_html(marksheet_html)
+        ''')
 
-# ----------------- MODULE 11: A3 ANNUAL RESULT SHEET -----------------
+        if students_df.empty:
+            st.warning("⚠️ कक्षा में कोई विद्यार्थी पंजीकृत नहीं है। कृपया पहले 'विद्यार्थी मास्टर' में छात्र जोड़ें।")
+        else:
+            # Check Principal Gatekeeper
+            cur_role = st.session_state.get("authenticated_role", "PRINCIPAL")
+            if cur_role == "TEACHER":
+                render_html('''
+                <div style="background: #FEF2F2; border: 1.5px solid #FCA5A5; border-left: 5px solid #EF4444; padding: 14px 18px; border-radius: 6px; color: #991B1B; margin: 12px 0;">
+                    <b style="font-size: 14px;">🔒 डाउनलोड प्रतिबंधित (Access Denied for Teacher Role):</b><br>
+                    <span style="font-size: 12.5px;">
+                        आप शिक्षक (Teacher) खाते से लॉग इन हैं। शासकीय छात्र डेटा सुरक्षा नियमानुसार पूरी कक्षा का एक्सेल/CSV डेटा डाउनलोड करने की अनुमति केवल <b>संस्था प्रधान (Principal)</b> को है।<br>
+                        यदि आपको इस फ़ाइल की आवश्यकता है, तो कृपया संस्था प्रधान से संपर्क करें या संस्था प्रधान खाते से लॉग इन करें।
+                    </span>
+                </div>
+                ''')
+            else:
+                # Principal Account Gatekeeper with OTP & Declaration
+                if render_export_gatekeeper(f"{selected_class} शासकीय पोर्टल डेटा डाउनलोड"):
+                    c_pdw1, c_pdw2 = st.columns(2)
+                    with c_pdw1:
+                        x_bytes, x_mime, _ = export_dataframe_bytes(portal_export_df, "Excel (.xlsx)")
+                        st.download_button(
+                            f"📥 पूरी कक्षा की एक्सेल फ़ाइल डाउनलोड करें (.xlsx)",
+                            data=x_bytes,
+                            file_name=f"{def_file_name}_{cur_sess}.xlsx",
+                            mime=x_mime,
+                            type="primary",
+                            use_container_width=True,
+                            key=f"btn_tab9_dw_xlsx_{selected_class}"
+                        )
+                    with c_pdw2:
+                        c_bytes, c_mime, _ = export_dataframe_bytes(portal_export_df, "CSV (.csv)")
+                        st.download_button(
+                            f"📥 पूरी कक्षा की CSV फ़ाइल डाउनलोड करें (.csv)",
+                            data=c_bytes,
+                            file_name=f"{def_file_name}_{cur_sess}.csv",
+                            mime=c_mime,
+                            use_container_width=True,
+                            key=f"btn_tab9_dw_csv_{selected_class}"
+                        )
+
+            with st.expander("👁️ पोर्टल पर अपलोड होने वाले डेटा की तालिका देखें (Preview Data Table)", expanded=False):
+                st.dataframe(portal_export_df, use_container_width=True)
+
+            st.divider()
+            st.subheader(f"🚀 सीधे {portal_name} पोर्टल पर लॉगिन करें")
+            c_link1, c_link2 = st.columns(2)
+            with c_link1:
+                st.markdown(f'<a href="{portal_url}" target="_blank" style="text-decoration: none;"><div style="background: #15803D; color: white; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 14px;">🌐 सीधे {portal_name} खोलें ↗</div></a>', unsafe_allow_html=True)
+                st.caption(f"पोर्टल पर अपने स्कूल यूजर आईडी/पासवर्ड से लॉगिन कर डाउनलोड की गई एक्सेल/CSV फ़ाइल अपलोड करें।")
+            with c_link2:
+                st.markdown('<a href="https://shikshaportal.mp.gov.in" target="_blank" style="text-decoration: none;"><div style="background: #0D9488; color: white; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 14px;">📚 समग्र शिक्षा पोर्टल खोलें ↗</div></a>', unsafe_allow_html=True)
+                st.caption("छात्रवृत्ति एवं प्रोफ़ाइल सत्यापन हेतु")
+
+    # ---------------- SUB-TAB 2: PRINT INDIVIDUAL MARKSHEET ----------------
+    with tab_p2:
+        if students_df.empty:
+            st.warning("कक्षा में विद्यार्थी पंजीकृत नहीं हैं।")
+        else:
+            st_names = [f"Roll {s['Roll_No']}: {s['Name']}" for _, s in students_df.iterrows()]
+            sel_st_str = st.selectbox("विद्यार्थी चुनें:", st_names, key=f"sel_st_marksheet_{selected_class}")
+            sel_r = int(sel_st_str.split(":")[0].replace("Roll", "").strip())
+            stud = students_df[students_df["Roll_No"] == sel_r].iloc[0]
+            ev = ms_cls_data["evaluations"].get(sel_r, {})
+            m_dict = ev.get("marks", {})
+
+            c_btn1, c_btn2 = st.columns([3, 1])
+            with c_btn2:
+                st.button("🖨️ Print Marksheet", type="primary", use_container_width=True, key=f"btn_print_ms_{selected_class}_{sel_r}")
+
+            cur_exam_rule = get_session_exam_rule(cur_sess, selected_class)
+            has_proj_comp = any(c["id"] == "project" for c in cur_exam_rule["components"])
+
+            rows_h = ""
+            tot_marks = 0
+            if has_proj_comp:
+                for idx, sub in enumerate(cls_subjects):
+                    se = m_dict.get(sub["id"], {})
+                    hy = se.get("half_yearly", 16)
+                    proj = se.get("project", 16)
+                    yr = se.get("annual", 48)
+                    t = se.get("total", hy + proj + yr)
+                    g = se.get("grade", calculate_grade(t))
+                    tot_marks += t
+                    rows_h += f"<tr style='height:28px; text-align:center;'><td style='border:1px solid #000;'>{idx+1}</td><td style='border:1px solid #000; text-align:left; padding-left:8px;'><b>{sub['name']}</b></td><td style='border:1px solid #000;'>{hy}</td><td style='border:1px solid #000;'>{proj}</td><td style='border:1px solid #000;'>{yr}</td><td style='border:1px solid #000; font-weight:bold; color:#1E3A8A;'>{t}</td><td style='border:1px solid #000; font-weight:bold;'>{g}</td></tr>"
+
+                table_header_html = """
+                    <tr style="background:#F1F5F9; height:30px; font-weight:bold; text-align:center;">
+                        <th style="border:1px solid #000; width:6%;">क्र.</th>
+                        <th style="border:1px solid #000; text-align:left; padding-left:8px;">विषय (Subject)</th>
+                        <th style="border:1px solid #000; width:15%;">अर्धवार्षिक [20]</th>
+                        <th style="border:1px solid #000; width:15%;">प्रोजेक्ट कार्य [20]</th>
+                        <th style="border:1px solid #000; width:18%;">वार्षिक लिखित [60]</th>
+                        <th style="border:1px solid #000; width:16%;">कुल [100]</th>
+                        <th style="border:1px solid #000; width:10%;">ग्रेड</th>
+                    </tr>
+                """
+                grand_total_row = f"""
+                    <tr style="background:#FFFDF0; height:32px; font-weight:bold; text-align:center; font-size:13px;">
+                        <td colspan="5" style="border:1px solid #000; text-align:right; padding-right:12px;">महायोग (Grand Total):</td>
+                        <td style="border:1px solid #000; color:#1E3A8A;">{tot_marks} / {len(cls_subjects) * 100}</td>
+                        <td style="border:1px solid #000; color:green;">{calculate_grade(round((tot_marks / (len(cls_subjects)*100))*100, 1) if cls_subjects else 0)}</td>
+                    </tr>
+                """
+            else:
+                for idx, sub in enumerate(cls_subjects):
+                    se = m_dict.get(sub["id"], {})
+                    hy = se.get("half_yearly", 32)
+                    yr = se.get("annual", 48)
+                    t = se.get("total", hy + yr)
+                    g = se.get("grade", calculate_grade(t))
+                    tot_marks += t
+                    rows_h += f"<tr style='height:28px; text-align:center;'><td style='border:1px solid #000;'>{idx+1}</td><td style='border:1px solid #000; text-align:left; padding-left:8px;'><b>{sub['name']}</b></td><td style='border:1px solid #000;'>{hy}</td><td style='border:1px solid #000;'>{yr}</td><td style='border:1px solid #000; font-weight:bold; color:#1E3A8A;'>{t}</td><td style='border:1px solid #000; font-weight:bold;'>{g}</td></tr>"
+
+                table_header_html = """
+                    <tr style="background:#F1F5F9; height:30px; font-weight:bold; text-align:center;">
+                        <th style="border:1px solid #000; width:8%;">क्र.</th>
+                        <th style="border:1px solid #000; text-align:left; padding-left:8px;">विषय (Subject)</th>
+                        <th style="border:1px solid #000; width:18%;">अर्धवार्षिक [40]</th>
+                        <th style="border:1px solid #000; width:18%;">वार्षिक परीक्षा [60]</th>
+                        <th style="border:1px solid #000; width:18%;">कुल [100]</th>
+                        <th style="border:1px solid #000; width:12%;">ग्रेड</th>
+                    </tr>
+                """
+                grand_total_row = f"""
+                    <tr style="background:#FFFDF0; height:32px; font-weight:bold; text-align:center; font-size:13px;">
+                        <td colspan="4" style="border:1px solid #000; text-align:right; padding-right:12px;">महायोग (Grand Total):</td>
+                        <td style="border:1px solid #000; color:#1E3A8A;">{tot_marks} / {len(cls_subjects) * 100}</td>
+                        <td style="border:1px solid #000; color:green;">{calculate_grade(round((tot_marks / (len(cls_subjects)*100))*100, 1) if cls_subjects else 0)}</td>
+                    </tr>
+                """
+
+            max_m = len(cls_subjects) * 100
+            pct = round((tot_marks / max_m) * 100, 1) if max_m else 0
+
+            marksheet_html = f"""
+            <div class="printable-area" style="background:#ffffff; border:3px double #1E3A8A; padding:20px; max-width:850px; margin:auto; color:#000;">
+                <div style="text-align:center; margin-bottom:15px;">
+                    <div style="font-size:14px; font-weight:bold; color:#1E3A8A;">मध्य प्रदेश शासन • स्कूल शिक्षा विभाग</div>
+                    <div style="font-size:22px; font-weight:900; color:#0F172A; text-transform:uppercase;">समग्र प्रगति पत्रक (Holistic Progress Card)</div>
+                    <div style="font-size:16px; font-weight:bold; color:#1E3A8A;">{s_info.get('name','')}</div>
+                    <div style="font-size:12px; color:#555;">DISE: {s_info.get('udise','')} | ब्लॉक: {s_info.get('block','')} | जिला: {s_info.get('district','')} | सत्र: {cur_sess}</div>
+                </div>
+                <table style="width:100%; border-collapse:collapse; border:1px solid #000; font-size:12px; margin-bottom:12px; background:#f8fafc;">
+                    <tr>
+                        <td style="border:1px solid #000; padding:6px;"><b>विद्यार्थी का नाम:</b> {stud['Name']}</td>
+                        <td style="border:1px solid #000; padding:6px;"><b>अनुक्रमांक (Roll No):</b> <b style="color:#B91C1C; font-size:14px;">{stud['Roll_No']}</b></td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid #000; padding:6px;"><b>पिता का नाम:</b> {stud['Father_Name']}</td>
+                        <td style="border:1px solid #000; padding:6px;"><b>दाखिला क्र. (Scholar):</b> {stud.get('Scholar_No','--')}</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid #000; padding:6px;"><b>माता का नाम:</b> {stud['Mother_Name']}</td>
+                        <td style="border:1px solid #000; padding:6px;"><b>समग्र आईडी:</b> {stud.get('SSSM_ID','--')}</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid #000; padding:6px;"><b>कक्षा व वर्ग:</b> {selected_class} - {stud.get('Section','A')}</td>
+                        <td style="border:1px solid #000; padding:6px;"><b>जन्मतिथि:</b> {stud.get('DOB','--')}</td>
+                    </tr>
+                </table>
+                <table style="width:100%; border-collapse:collapse; border:1px solid #000; font-size:12px; margin-bottom:12px;">
+                    {table_header_html}
+                    {rows_h}
+                    {grand_total_row}
+                </table>
+                <div style="display:flex; justify-content:space-between; margin-top:40px; text-align:center; font-size:12px; font-weight:bold;">
+                    <div>_________________________<br>कक्षा अध्यापक हस्ताक्षर</div>
+                    <div>_________________________<br>परीक्षा प्रभारी</div>
+                    <div>_________________________<br>संस्था प्रधान (मुद्रा सहित)</div>
+                </div>
+            </div>
+            """
+            render_html(marksheet_html)
+
+# ----------------- MODULE 10: A3 ANNUAL RESULT SHEET -----------------
 elif menu == T["nav_a3_result"]:
     students_df = cls_data["students"]
     s_info = st.session_state.school_info
@@ -3861,7 +3852,7 @@ elif menu == T["nav_a3_result"]:
             t = se.get("total", (h + p + y) if has_proj_comp else (h + y))
             tot_obt += t
             
-            # RSKMP / MPBSE Statutory Passing Rule:
+            # Statutory Passing criteria
             if has_proj_comp:
                 if h < 7 or p < 7 or y < 20 or t < 33:
                     all_p = False
@@ -3959,15 +3950,36 @@ elif menu == T["nav_a3_result"]:
     """
     render_html(a3_html)
 
-# ----------------- MODULE 12: SUMMARY -----------------
+    st.divider()
+    st.subheader("📥 A3 वार्षिक परीक्षाफल पत्रक डाउनलोड केंद्र (केवल Principal हेतु)")
+    
+    cur_role_a3 = st.session_state.get("authenticated_role", "PRINCIPAL")
+    if cur_role_a3 == "TEACHER":
+        render_html('''
+        <div style="background: #FEF2F2; border-left: 4px solid #EF4444; padding: 12px 16px; border-radius: 6px; color: #991B1B; font-size: 12.5px;">
+            <b>🔒 शासकीय डेटा सुरक्षा सूचना:</b> A3 संपूर्ण कक्षा परीक्षाफल पत्रक डाउनलोड करने का अधिकार केवल <b>संस्था प्रधान (Principal)</b> खाते में अधिकृत है।
+        </div>
+        ''')
+    else:
+        if render_export_gatekeeper(f"A3 परीक्षाफल पत्रक ({selected_class})"):
+            c_a3_dw1, c_a3_dw2 = st.columns(2)
+            m44_export = generate_master_44col_df(students_df, cls_data["evaluations"], cls_subjects, s_info, selected_class)
+            with c_a3_dw1:
+                x_bytes, x_mime, _ = export_dataframe_bytes(m44_export, "Excel (.xlsx)")
+                st.download_button("📥 A3 परिणाम शीट डाउनलोड (Excel .xlsx)", data=x_bytes, file_name=f"A3_Annual_Result_{selected_class}_{s_info.get('session','2026-27')}.xlsx", mime=x_mime, type="primary", use_container_width=True, key=f"btn_dw_a3_xlsx_{selected_class}")
+            with c_a3_dw2:
+                c_bytes, c_mime, _ = export_dataframe_bytes(m44_export, "CSV (.csv)")
+                st.download_button("📥 A3 परिणाम शीट डाउनलोड (CSV .csv)", data=c_bytes, file_name=f"A3_Annual_Result_{selected_class}_{s_info.get('session','2026-27')}.csv", mime=c_mime, use_container_width=True, key=f"btn_dw_a3_csv_{selected_class}")
+
+# ----------------- MODULE 11: SUMMARY -----------------
 elif menu == T["nav_summary"]:
     st.markdown('<div class="main-header">📊 श्रेणीवार एवं ग्रेडवार परीक्षा परिणाम सारांश</div>', unsafe_allow_html=True)
     st.info("कक्षा का संपूर्ण श्रेणीवार (SC/ST/OBC/GEN) एवं ग्रेडवार सारांश।")
     summary_df = generate_master_44col_df(cls_data["students"], cls_data["evaluations"], get_class_subjects(selected_class), st.session_state.school_info, selected_class)
     st.dataframe(summary_df, use_container_width=True)
 
-# ----------------- MODULE 13: MERIT LIST -----------------
-elif menu == T.get("nav_merit", "🏆 13. वार्षिक परीक्षा प्रावीण्य सूची (Merit List)"): 
+# ----------------- MODULE 12: MERIT LIST -----------------
+elif menu == T.get("nav_merit", "🏆 12. वार्षिक परीक्षा प्रावीण्य सूची (Merit List)"):
     st.markdown('<div class="main-header">🏆 वार्षिक परीक्षा प्रावीण्य सूची (Merit List)</div>', unsafe_allow_html=True)
     m_df = cls_data["students"].copy()
     if not m_df.empty:
@@ -3982,9 +3994,9 @@ elif menu == T.get("nav_merit", "🏆 13. वार्षिक परीक्�
         res_df["Rank"] = range(1, len(res_df) + 1)
         st.dataframe(res_df[["Rank", "Roll_No", "Name", "Father_Name", "Total", "Percentage", "Grade"]], use_container_width=True)
 
-# ----------------- MODULE 14: SUPPLEMENTARY LIST -----------------
-elif menu == T.get("nav_supple", "📋 14. पूरक परीक्षा छात्र सूची (Supplementary List)"): 
-    st.markdown('<div class="main-header">📋 पूरक / अनुपूरक परीक्षा छात्र सूची (RSKMP एवं MPBSE नियमानुसार)</div>', unsafe_allow_html=True)
+# ----------------- MODULE 13: SUPPLEMENTARY LIST -----------------
+elif menu == T.get("nav_supple", "📋 13. पूरक परीक्षा छात्र सूची (Supplementary List)"):
+    st.markdown('<div class="main-header">📋 13. पूरक / अनुपूरक परीक्षा छात्र सूची (RSKMP एवं MPBSE नियमानुसार)</div>', unsafe_allow_html=True)
     cls_subs = get_class_subjects(selected_class)
     rule_cfg = get_session_exam_rule(st.session_state.school_info.get("session", "2026-27"), selected_class)
     has_proj = any(c["id"] == "project" for c in rule_cfg["components"])
@@ -4037,13 +4049,34 @@ elif menu == T.get("nav_supple", "📋 14. पूरक परीक्षा �
     else:
         st.success("🎉 बधाई! कोई भी छात्र पूरक परीक्षा हेतु नहीं है (समस्त छात्र शासकीय न्यूनतम अर्हता अनुसार उत्तीर्ण)!")
 
-# ----------------- MODULE 15: WEIGHTED EVALUATION SHEET -----------------
-elif menu == T.get("nav_weighted", "📑 15. वार्षिक परीक्षा परिणाम अभिलेख पत्रक (RSKMP व MPBSE प्रारूप)"): 
-    st.markdown('<div class="main-header">📑 वार्षिक परीक्षा परिणाम अभिलेख पत्रक (35-कॉलम वेटेज शीट)</div>', unsafe_allow_html=True)
+# ----------------- MODULE 14: WEIGHTED EVALUATION SHEET -----------------
+elif menu == T.get("nav_weighted", "📑 14. वार्षिक परीक्षा परिणाम अभिलेख पत्रक (RSKMP व MPBSE प्रारूप)"):
+    st.markdown('<div class="main-header">📑 14. वार्षिक परीक्षा परिणाम अभिलेख पत्रक (35-कॉलम वेटेज शीट)</div>', unsafe_allow_html=True)
     w_df = generate_master_44col_df(cls_data["students"], cls_data["evaluations"], get_class_subjects(selected_class), st.session_state.school_info, selected_class)
     st.dataframe(w_df, use_container_width=True)
 
-# ----------------- MODULE 16: SESSION CHANGE & PROMOTION -----------------
+    st.divider()
+    st.subheader("📥 संपूर्ण 44-कॉलम अभिलेख पत्रक डाउनलोड केंद्र (केवल Principal हेतु)")
+    
+    cur_role_w = st.session_state.get("authenticated_role", "PRINCIPAL")
+    if cur_role_w == "TEACHER":
+        render_html('''
+        <div style="background: #FEF2F2; border-left: 4px solid #EF4444; padding: 12px 16px; border-radius: 6px; color: #991B1B; font-size: 12.5px;">
+            <b>🔒 शासकीय डेटा सुरक्षा सूचना:</b> संपूर्ण अभिलेख पत्रक (समस्त व्यक्तिगत विवरण व अंक) डाउनलोड करने का अधिकार केवल <b>संस्था प्रधान (Principal)</b> खाते में अधिकृत है।
+        </div>
+        ''')
+    else:
+        if render_export_gatekeeper(f"44-कॉलम अभिलेख पत्रक ({selected_class})"):
+            col_w1, col_w2 = st.columns(2)
+            cur_sess_w = st.session_state.school_info.get("session", "2026-27")
+            with col_w1:
+                x_bytes, x_mime, _ = export_dataframe_bytes(w_df, "Excel (.xlsx)")
+                st.download_button("📥 संपूर्ण 44-कॉलम अभिलेख पत्रक (Excel .xlsx)", data=x_bytes, file_name=f"Abhilekh_Patrak_{selected_class}_{cur_sess_w}.xlsx", mime=x_mime, type="primary", use_container_width=True, key=f"btn_dw_abhilekh_xlsx_{selected_class}")
+            with col_w2:
+                c_bytes, c_mime, _ = export_dataframe_bytes(w_df, "CSV (.csv)")
+                st.download_button("📥 संपूर्ण 44-कॉलम अभिलेख पत्रक (CSV .csv)", data=c_bytes, file_name=f"Abhilekh_Patrak_{selected_class}_{cur_sess_w}.csv", mime=c_mime, use_container_width=True, key=f"btn_dw_abhilekh_csv_{selected_class}")
+
+# ----------------- MODULE 15: SESSION CHANGE & PROMOTION -----------------
 elif menu == T["nav_promote"]:
     st.markdown('<div class="main-header">🔄 सत्र परिवर्तन एवं कक्षा पदोन्नति (Session Promotion)</div>', unsafe_allow_html=True)
     col_p1, col_p2 = st.columns(2)
