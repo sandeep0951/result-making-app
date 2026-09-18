@@ -410,14 +410,35 @@ def generate_master_44col_df(students_df, evaluations, cls_subjects, school_info
 TODAY_STR = datetime.now().strftime("%d %B %Y")
 
 # ----------------- CUSTOM CSS FOR BEAUTIFUL UI, DEVANAGARI FONTS & PRINTING (A4 & A3) -----------------
-render_html("""
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+st.markdown("""
 <style>
-    /* Universal Devanagari Hindi font enforcement preventing Tofu squares */
-    html, body, [class*="css"], div, span, label, input, button, select, textarea, table, th, td, h1, h2, h3, h4, h5, h6 {
-        font-family: 'Noto Sans Devanagari', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;600;700;800;900&display=swap');
+    
+    /* Apply Devanagari font cleanly to text elements without breaking Streamlit icon fonts */
+    html, body, [data-testid="stAppViewContainer"], [data-testid="stHeader"], [data-testid="stSidebar"], .stMarkdown, p, h1, h2, h3, h4, h5, h6, label, input, select, textarea, table, th, td {
+        font-family: 'Noto Sans Devanagari', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    }
+    
+    /* CRITICAL FIX: Protect Streamlit Material Symbols / Icon ligatures from being overridden */
+    /* When generic 'span' or '*' has font-family overridden, icon ligatures like 'arrow_right' or 'upload' become raw text and overlap */
+    [data-testid*="Icon"], [class*="material-symbols"], [class*="material-icons"], span[translate="no"], i, svg {
+        font-family: 'Material Symbols Rounded', 'Material Icons', sans-serif !important;
+        font-style: normal;
+        letter-spacing: normal;
+        text-transform: none;
+        display: inline-block;
+        white-space: nowrap;
+        word-wrap: normal;
+        direction: ltr;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+render_html("""
+<style>
+    /* Secondary fallback for HTML blocks */
+    html, body, div, span, table, th, td {
+        font-family: 'Noto Sans Devanagari', sans-serif !important;
     }
     .main-header {
         font-size: 25px;
@@ -3957,7 +3978,7 @@ elif menu == T.get("nav_merit", "🏆 13. वार्षिक परीक्�
             tot = sum([ev.get("marks", {}).get(sub["id"], {}).get("total", 0) for sub in cls_subs])
             pct = round((tot / (len(cls_subs)*100)) * 100, 1)
             records.append({"Roll_No": s["Roll_No"], "Name": s["Name"], "Father_Name": s["Father_Name"], "Total": tot, "Percentage": pct, "Grade": calculate_grade(pct)})
-        res_df = pd.DataFrame(records).sort_values(by="Total", reverse=True)
+        res_df = pd.DataFrame(records).sort_values(by="Total", ascending=False)
         res_df["Rank"] = range(1, len(res_df) + 1)
         st.dataframe(res_df[["Rank", "Roll_No", "Name", "Father_Name", "Total", "Percentage", "Grade"]], use_container_width=True)
 
