@@ -1,2 +1,3 @@
 fonts-indic
 fonts-lohit-deva
+fonts-noto-core
