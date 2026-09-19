@@ -1149,6 +1149,7 @@ def parse_sheet_students_robust(raw_df, target_class):
             att_days = int(str(att_raw))
             
         st_entry = {
+            "_excel_idx": len(student_rows) + 1,
             "Roll_No": int(roll_val),
             "Scholar_No": scholar_val,
             "Name": raw_name,
@@ -2055,14 +2056,22 @@ def sort_students_dataframe(df, sort_by="Roll_No"):
     if df is None or df.empty:
         return df
     sorted_df = df.copy()
-    if sort_by in ["Roll_No", "Roll"]:
+    if "एक्सेल" in str(sort_by) or "excel" in str(sort_by).lower():
+        if "_excel_idx" in sorted_df.columns:
+            return sorted_df.sort_values(by="_excel_idx")
+        return sorted_df
+    elif "उलटे" in str(sort_by) or "desc" in str(sort_by).lower():
+        if "Roll_No" in sorted_df.columns:
+            sorted_df["_sort_roll"] = pd.to_numeric(sorted_df["Roll_No"], errors="coerce").fillna(-1)
+            sorted_df = sorted_df.sort_values(by="_sort_roll", ascending=False).drop(columns=["_sort_roll"])
+    elif "रोल" in str(sort_by) or sort_by in ["Roll_No", "Roll"]:
         if "Roll_No" in sorted_df.columns:
             sorted_df["_sort_roll"] = pd.to_numeric(sorted_df["Roll_No"], errors="coerce").fillna(999999)
-            sorted_df = sorted_df.sort_values(by="_sort_roll").drop(columns=["_sort_roll"])
-    elif sort_by in ["Name", "Alphabetical", "A to Z"]:
+            sorted_df = sorted_df.sort_values(by="_sort_roll", ascending=True).drop(columns=["_sort_roll"])
+    elif "वर्णमाला" in str(sort_by) or sort_by in ["Name", "Alphabetical", "A to Z"]:
         if "Name" in sorted_df.columns:
             sorted_df = sorted_df.sort_values(by="Name", key=lambda col: col.astype(str).str.lower())
-    elif sort_by in ["Scholar_No", "Scholar"]:
+    elif "दाखिला" in str(sort_by) or sort_by in ["Scholar_No", "Scholar"]:
         if "Scholar_No" in sorted_df.columns:
             sorted_df["_sort_sch"] = pd.to_numeric(sorted_df["Scholar_No"], errors="coerce").fillna(999999)
             sorted_df = sorted_df.sort_values(by="_sort_sch").drop(columns=["_sort_sch"])
@@ -2119,7 +2128,9 @@ def reorder_student_columns(df):
         if col not in df.columns:
             df[col] = ""
     present_cols = [c for c in target_order if c in df.columns]
-    extra_cols = [c for c in df.columns if c not in target_order and not any(k in str(c).strip().lower().replace(" ", "").replace("_", "").replace("-", "") for k in ["apaar", "apar"])]
+    extra_cols = [c for c in df.columns if c not in target_order and c != "_excel_idx" and not any(k in str(c).strip().lower().replace(" ", "").replace("_", "").replace("-", "") for k in ["apaar", "apar"])]
+    if "_excel_idx" in df.columns:
+        present_cols = present_cols + ["_excel_idx"]
     return df[present_cols + extra_cols]
 
 def get_class_data(cls_name):
@@ -3387,7 +3398,7 @@ elif menu == T["nav_student"]:
         with c_stsort2:
             st_view_sort = st.radio(
                 "🔀 सूची प्रदर्शन क्रम:",
-                ["रोल नंबर अनुसार (Roll No.)", "वर्णमाला क्रम (A to Z Name)", "दाखिला क्र. (Scholar No.)"],
+                ["एक्सेल शीट क्रम (Excel Order)", "रोल नंबर अनुसार (Roll No.)", "वर्णमाला क्रम (A to Z Name)", "दाखिला क्र. (Scholar No.)"],
                 horizontal=True,
                 key="st_master_sort_selector"
             )
@@ -3437,7 +3448,8 @@ elif menu == T["nav_student"]:
                 "Status": st.column_config.SelectboxColumn("Status", options=["Present", "Absent"]),
                 "Photo_b64": None,
                 "Total_Days": st.column_config.NumberColumn("Total Days"),
-                "Attended_Days": st.column_config.NumberColumn("Attended Days")
+                "Attended_Days": st.column_config.NumberColumn("Attended Days"),
+                "_excel_idx": None
             },
             key=f"editor_students_{selected_class}_{cur_role}"
         )
