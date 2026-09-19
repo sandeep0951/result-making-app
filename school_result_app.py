@@ -897,6 +897,169 @@ def generate_official_goshwara_summary_df(students_df, evaluations, cls_subjects
     summary_rows.append(total_row)
     return pd.DataFrame(summary_rows)
 
+# ----------------- UNIVERSAL ROBUST EXCEL WORKBOOK MIGRATOR ENGINE -----------------
+
+def match_excel_sheet_to_class(sheet_name, raw_df, existing_classes):
+    """Matches any Excel sheet name or header text to canonical app class name"""
+    s = str(sheet_name).lower().strip().replace(" ", "").replace("-", "").replace("_", "")
+    for c in existing_classes:
+        cl = c.lower().replace(" ", "").replace("-", "").replace("_", "")
+        if s == cl or s in cl or cl.replace("class", "") == s:
+            return c
+            
+    # Fuzzy keyword matching on sheet name
+    if "nur" in s: return "Class Nursery"
+    if "lkg" in s: return "Class LKG"
+    if "ukg" in s or "kg2" in s: return "Class UKG"
+    for num, suffix in [("1", "1st"), ("2", "2nd"), ("3", "3rd"), ("4", "4th"), ("5", "5th"), 
+                        ("6", "6th"), ("7", "7th"), ("8", "8th"), ("9", "9th"), ("10", "10th")]:
+        if s == suffix or s == num or s == f"class{num}" or s == f"class{suffix}":
+            return f"Class {suffix}"
+            
+    # Deep inspect first 5 rows of sheet
+    limit_r = min(5, len(raw_df))
+    for r in range(limit_r):
+        row_str = " ".join([str(x).lower() for x in raw_df.iloc[r].dropna().tolist()])
+        for c in existing_classes:
+            cl = c.lower().replace("class", "").strip()
+            if f"class :, {cl}" in row_str or f"class: {cl}" in row_str or f"class:- {cl}" in row_str or f"class-{cl}" in row_str or f"class - {cl}" in row_str:
+                return c
+        for num, suffix in [("1", "1st"), ("2", "2nd"), ("3", "3rd"), ("4", "4th"), ("5", "5th"), 
+                            ("6", "6th"), ("7", "7th"), ("8", "8th"), ("9", "9th"), ("10", "10th")]:
+            if f"class:- {num}" in row_str or f"class:- {suffix}" in row_str or f"class-{suffix}" in row_str or f"class: {suffix}" in row_str:
+                return f"Class {suffix}"
+    return None
+
+def parse_sheet_students_robust(raw_df, target_class):
+    """Extracts all valid student records while skipping metadata, title, sub-headers and numbering rows"""
+    if raw_df.empty or len(raw_df) < 3:
+        return pd.DataFrame()
+        
+    h_idx = -1
+    for r in range(min(15, len(raw_df))):
+        vals = [str(x).lower().replace('\n', ' ').strip() for x in raw_df.iloc[r].dropna().tolist()]
+        has_name = any(('name' in x or 'विद्यार्थी' in x or 'छात्र' in x) and not 'school' in x and not 'vidyalaya' in x for x in vals)
+        has_id = any(k in x for x in vals for k in ['roll', 'scholar', 'samagra', 's.no', 's.n.', 'अनुक्रमांक', 'दाखिला'])
+        if has_name and has_id:
+            h_idx = r
+            break
+            
+    if h_idx == -1:
+        return pd.DataFrame()
+        
+    headers = [str(x).replace('\n', ' ').strip() for x in raw_df.iloc[h_idx]]
+    
+    col_map = {}
+    for idx, col in enumerate(headers):
+        cl = col.lower()
+        if any(k in cl for k in ["student's name", "name of student", "student name", "विद्यार्थी का नाम", "छात्र का नाम"]):
+            col_map["Name"] = idx
+        elif any(k in cl for k in ["father's name", "father name", "पिता का नाम", "pita"]):
+            col_map["Father_Name"] = idx
+        elif any(k in cl for k in ["mother's name", "mother name", "माता का नाम", "mata"]):
+            col_map["Mother_Name"] = idx
+        elif any(k in cl for k in ["roll no", "roll  no.", "roll", "अनुक्रमांक"]):
+            col_map["Roll_No"] = idx
+        elif any(k in cl for k in ["scholar number", "scholar no", "scholar", "दाखिला"]):
+            col_map["Scholar_No"] = idx
+        elif any(k in cl for k in ["date of birth", "dob", "जन्मतिथि", "birth"]):
+            col_map["DOB"] = idx
+        elif any(k in cl for k in ["gender", "लिंग", "sex"]):
+            col_map["Gender"] = idx
+        elif any(k in cl for k in ["category", "जाति", "वर्ग"]):
+            col_map["Category"] = idx
+        elif any(k in cl for k in ["samagra id", "samagra", "समग्र"]):
+            col_map["SSSM_ID"] = idx
+        elif any(k in cl for k in ["aadhaar no", "aadhar no", "aadhar", "आधार"]):
+            col_map["Aadhar_No"] = idx
+        elif any(k in cl for k in ["attendance/school", "attendance", "उपस्थिति"]):
+            col_map["Attendance"] = idx
+
+    if "Name" not in col_map:
+        for idx, col in enumerate(headers):
+            cl = col.lower()
+            if "name" in cl and not any(k in cl for k in ["father", "mother", "school"]):
+                col_map["Name"] = idx
+                break
+
+    if "Name" not in col_map:
+        return pd.DataFrame()
+
+    student_rows = []
+    
+    for r in range(h_idx + 1, len(raw_df)):
+        row = raw_df.iloc[r]
+        raw_name = str(row[col_map["Name"]]).strip()
+        
+        # Skip sub-header / metadata / column number rows
+        if not raw_name or raw_name.lower() in ["nan", "none", "", "name", "name of student", "obtained", "weightage", "max.-60", "max.", "min.", "total", "grand total", "result"]:
+            continue
+        if raw_name.replace(".", "").isdigit():
+            continue
+        if len(raw_name) < 2:
+            continue
+            
+        def clean_val(col_key, def_val=""):
+            if col_key in col_map and col_map[col_key] < len(row):
+                v = row[col_map[col_key]]
+                if pd.notna(v) and str(v).strip().lower() not in ["nan", "none", ""]:
+                    v_str = str(v).strip()
+                    if v_str.endswith(".0"): v_str = v_str[:-2]
+                    return v_str
+            return def_val
+
+        roll_val = clean_val("Roll_No", "")
+        if not roll_val or not roll_val.isdigit():
+            roll_val = str(len(student_rows) + 1)
+            
+        scholar_val = clean_val("Scholar_No", "")
+        father_val = clean_val("Father_Name", "")
+        mother_val = clean_val("Mother_Name", "")
+        dob_val = clean_val("DOB", "")
+        gender_val = clean_val("Gender", "Boy")
+        if str(gender_val).lower() in ["boy", "male", "m", "b", "छात्र"]: gender_val = "Boy"
+        elif str(gender_val).lower() in ["girl", "female", "f", "g", "छात्रा"]: gender_val = "Girl"
+        
+        cat_val = clean_val("Category", "General").upper()
+        if "SC" in cat_val: cat_val = "SC"
+        elif "ST" in cat_val: cat_val = "ST"
+        elif "OBC" in cat_val: cat_val = "OBC"
+        else: cat_val = "General"
+        
+        samagra_val = clean_val("SSSM_ID", "")
+        aadhar_val = clean_val("Aadhar_No", "")
+        
+        att_raw = clean_val("Attendance", "200/220")
+        att_days, tot_days = 200, 220
+        if "/" in str(att_raw):
+            pts = str(att_raw).split("/")
+            if pts[0].strip().isdigit(): att_days = int(pts[0].strip())
+            if len(pts) > 1 and pts[1].strip().isdigit(): tot_days = int(pts[1].strip())
+        elif str(att_raw).isdigit():
+            att_days = int(str(att_raw))
+            
+        st_entry = {
+            "Roll_No": int(roll_val),
+            "Scholar_No": scholar_val,
+            "Name": raw_name,
+            "Father_Name": father_val,
+            "Mother_Name": mother_val,
+            "DOB": dob_val,
+            "Class": target_class,
+            "Section": "A",
+            "Gender": gender_val,
+            "Category": cat_val,
+            "SSSM_ID": samagra_val,
+            "Aadhar_No": aadhar_val,
+            "Medium": "English" if any(k in target_class.lower() for k in ["nursery", "lkg", "ukg", "1st", "2nd"]) else "Hindi",
+            "Status": "Present",
+            "Attended_Days": att_days,
+            "Total_Days": tot_days
+        }
+        student_rows.append(st_entry)
+
+    return pd.DataFrame(student_rows)
+
 def render_govt_portals_hub(tab_title, target_class, export_df=None, default_file_name="Portal_Upload"):
     cur_role = st.session_state.get("authenticated_role", "PRINCIPAL")
     is_teacher = (cur_role == "TEACHER")
@@ -3399,12 +3562,15 @@ elif menu == T["nav_student"]:
                             st.rerun()
                     st.markdown("<hr style='margin:6px 0;'>", unsafe_allow_html=True)
         with tab6:
-            st.subheader("📥 यूनिवर्सल एक्सेल ऑनबोर्डिंग एवं मल्टी-शीट क्लास माइग्रेटर")
-            mig_up = st.file_uploader("📥 अपनी एक्सेल या सीएसवी फ़ाइल चुनें (.xlsx / .csv):", type=["xlsx", "csv"], key="uni_excel_mig_up")
+            st.subheader("📥 1-क्लिक यूनिवर्सल एक्सेल ऑनबोर्डिंग एवं मल्टी-शीट बल्क माइग्रेटर")
+            st.info("💡 **पूरी शाला का डेटा 1-क्लिक में इम्पोर्ट करें:** अपनी सम्पूर्ण स्कूल की एक्सेल शीट (जैसे Nursery से 10th तक सभी शीट्स वाली वर्कबुक) यहाँ अपलोड करें। सिस्टम सभी शीट्स की कक्षाओं को पहचानकर समस्त विद्यार्थियों का पूरा डेटा (बायो-डेटा + उपस्थिति) एक साथ बल्क में सुरक्षित कर देगा!")
+            
+            mig_up = st.file_uploader("📥 अपनी स्कूल एक्सेल या सीएसवी फ़ाइल चुनें (.xlsx / .csv):", type=["xlsx", "csv"], key="uni_excel_mig_up")
             if mig_up:
                 try:
                     file_bytes = mig_up.read()
                     sheet_data_dict = {}
+                    parsed_classes_dict = {}
                     extracted_excel_meta = {}
                     from collections import Counter
                     all_meta_names, all_meta_mediums, all_meta_sessions = [], [], []
@@ -3413,23 +3579,43 @@ elif menu == T["nav_student"]:
                     if mig_up.name.endswith(".csv"):
                         raw_csv_df = pd.read_csv(BytesIO(file_bytes), header=None)
                         extracted_excel_meta = extract_school_metadata_from_excel_rows(raw_csv_df)
-                        clean_df = parse_clean_excel_sheet(raw_csv_df)
-                        sheet_data_dict["Sheet1"] = clean_df
+                        parsed_st_df = parse_sheet_students_robust(raw_csv_df, selected_class)
+                        if not parsed_st_df.empty:
+                            parsed_classes_dict[selected_class] = parsed_st_df
+                            sheet_data_dict["Sheet1"] = parsed_st_df
                     else:
                         xl_file = pd.ExcelFile(BytesIO(file_bytes))
+                        cur_classes = list(st.session_state.get("classes_list", DEFAULT_CLASSES))
+                        # Comprehensive master class catalog
+                        catalog_classes = [
+                            "Class Nursery", "Class LKG", "Class UKG", "Class 1st", "Class 2nd", 
+                            "Class 3rd", "Class 4th", "Class 5th", "Class 6th", "Class 7th", 
+                            "Class 8th", "Class 9th", "Class 10th"
+                        ]
+                        for cat_c in catalog_classes:
+                            if cat_c not in cur_classes:
+                                cur_classes.append(cat_c)
+
                         for sh_name in xl_file.sheet_names:
+                            # Skip pure summary sheets
+                            if any(k in sh_name.lower() for k in ["summary", "cost total", "goshwara"]):
+                                continue
                             raw_sh_df = xl_file.parse(sh_name, header=None)
-                            if not raw_sh_df.empty and len(raw_sh_df) > 0:
+                            if not raw_sh_df.empty and len(raw_sh_df) > 2:
                                 sh_meta = extract_school_metadata_from_excel_rows(raw_sh_df)
-                                weight = 3 if any(k in sh_name.lower() for k in ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]) else 1
-                                if "name" in sh_meta and sh_meta["name"]: all_meta_names.extend([sh_meta["name"]] * weight)
-                                if "medium" in sh_meta and sh_meta["medium"]: all_meta_mediums.extend([sh_meta["medium"]] * weight)
-                                if "session" in sh_meta and sh_meta["session"]: all_meta_sessions.extend([sh_meta["session"]] * weight)
-                                if "block" in sh_meta and sh_meta["block"]: all_meta_blocks.extend([sh_meta["block"]] * weight)
-                                if "district" in sh_meta and sh_meta["district"]: all_meta_districts.extend([sh_meta["district"]] * weight)
-                                if "udise" in sh_meta and sh_meta["udise"]: all_meta_udises.extend([sh_meta["udise"]] * weight)
-                                clean_df = parse_clean_excel_sheet(raw_sh_df)
-                                if not clean_df.empty: sheet_data_dict[sh_name] = clean_df
+                                if "name" in sh_meta and sh_meta["name"]: all_meta_names.append(sh_meta["name"])
+                                if "medium" in sh_meta and sh_meta["medium"]: all_meta_mediums.append(sh_meta["medium"])
+                                if "session" in sh_meta and sh_meta["session"]: all_meta_sessions.append(sh_meta["session"])
+                                if "block" in sh_meta and sh_meta["block"]: all_meta_blocks.append(sh_meta["block"])
+                                if "district" in sh_meta and sh_meta["district"]: all_meta_districts.append(sh_meta["district"])
+                                if "udise" in sh_meta and sh_meta["udise"]: all_meta_udises.append(sh_meta["udise"])
+
+                                matched_cls = match_excel_sheet_to_class(sh_name, raw_sh_df, cur_classes)
+                                if matched_cls:
+                                    parsed_st = parse_sheet_students_robust(raw_sh_df, matched_cls)
+                                    if not parsed_st.empty:
+                                        parsed_classes_dict[matched_cls] = parsed_st
+                                        sheet_data_dict[sh_name] = parsed_st
 
                     if all_meta_names: extracted_excel_meta["name"] = Counter(all_meta_names).most_common(1)[0][0]
                     if all_meta_mediums: extracted_excel_meta["medium"] = Counter(all_meta_mediums).most_common(1)[0][0]
@@ -3438,18 +3624,18 @@ elif menu == T["nav_student"]:
                     if all_meta_districts: extracted_excel_meta["district"] = Counter(all_meta_districts).most_common(1)[0][0]
                     if all_meta_udises: extracted_excel_meta["udise"] = Counter(all_meta_udises).most_common(1)[0][0]
 
-                    with st.expander("🏫 एक्सेल हेडर से पहचानी गई संस्था जानकारी:", expanded=True):
+                    with st.expander("🏫 एक्सेल फ़ाइल से पहचानी गई शाला की जानकारी (School Info):", expanded=True):
                         c_meta_r1, c_meta_r2 = st.columns(2)
                         with c_meta_r1:
-                            conf_name = st.text_input("🏫 स्कूल का नाम:*", value=extracted_excel_meta.get("name", st.session_state.school_info.get("name", "PALI GYAN MANDIR HIGH SCHOOL")), key="mig_conf_name_input")
-                            cur_med_val = extracted_excel_meta.get("medium", st.session_state.school_info.get("medium", "Hindi (हिन्दी)"))
-                            m_idx = ALL_MEDIUMS.index(cur_med_val) if cur_med_val in ALL_MEDIUMS else 0
-                            conf_med = st.selectbox("🌐 माध्यम:*", ALL_MEDIUMS, index=m_idx, key="mig_conf_med_picker")
-                            conf_sess = st.text_input("📅 सत्र:*", value=extracted_excel_meta.get("session", st.session_state.school_info.get("session", "2025-26")), key="mig_conf_sess_input")
+                            conf_name = st.text_input("🏫 स्कूल का नाम:*", value=extracted_excel_meta.get("name", st.session_state.school_info.get("name", "PALI GYAN MANDIR HIGH SCHOOL, SENDHWA")), key="mig_conf_name_input")
+                            cur_med_val = extracted_excel_meta.get("medium", st.session_state.school_info.get("medium", "English (अंग्रेजी)"))
+                            m_idx = ALL_MEDIUMS.index(cur_med_val) if cur_med_val in ALL_MEDIUMS else 1
+                            conf_med = st.selectbox("🌐 मुख्य माध्यम:*", ALL_MEDIUMS, index=m_idx, key="mig_conf_med_picker")
+                            conf_sess = st.text_input("📅 शैक्षणिक सत्र:*", value=extracted_excel_meta.get("session", st.session_state.school_info.get("session", "2025-26")), key="mig_conf_sess_input")
                         with c_meta_r2:
-                            conf_block = st.text_input("📍 ब्लॉक:*", value=extracted_excel_meta.get("block", st.session_state.school_info.get("block", "SENDHWA")), key="mig_conf_block_input")
-                            conf_dist = st.text_input("🏙️ जिला:*", value=extracted_excel_meta.get("district", st.session_state.school_info.get("district", "BARWANI")), key="mig_conf_dist_input")
-                            conf_udise = st.text_input("🔢 डाइस कोड:*", value=extracted_excel_meta.get("udise", st.session_state.school_info.get("udise", "23260100101")), key="mig_conf_udise_input")
+                            conf_block = st.text_input("📍 विकासखंड (Block):*", value=extracted_excel_meta.get("block", st.session_state.school_info.get("block", "SENDHWA")), key="mig_conf_block_input")
+                            conf_dist = st.text_input("🏙️ जिला (District):*", value=extracted_excel_meta.get("district", st.session_state.school_info.get("district", "BARWANI")), key="mig_conf_dist_input")
+                            conf_udise = st.text_input("🔢 UDISE कोड:*", value=extracted_excel_meta.get("udise", st.session_state.school_info.get("udise", "23280509826")), key="mig_conf_udise_input")
 
                     st.session_state.school_info["name"] = conf_name
                     st.session_state.school_info["medium"] = conf_med
@@ -3458,7 +3644,49 @@ elif menu == T["nav_student"]:
                     st.session_state.school_info["district"] = conf_dist
                     st.session_state.school_info["udise"] = conf_udise
 
-                    st.success(f"🎉 फ़ाइल पढ़ी गई: कुल {len(sheet_data_dict)} शीट्स पाई गईं।")
+                    if parsed_classes_dict:
+                        tot_students_found = sum(len(df) for df in parsed_classes_dict.values())
+                        st.success(f"🎉 **एक्सेल विश्लेषण सफल!** कुल **{len(parsed_classes_dict)} कक्षाओं** के **{tot_students_found} विद्यार्थियों** का संपूर्ण डेटा सफलतापूर्वक पढ़ लिया गया है।")
+                        
+                        # Show summary table of detected classes
+                        preview_summary = []
+                        for c_name, c_df in parsed_classes_dict.items():
+                            preview_summary.append({
+                                "कक्षा (Class)": c_name,
+                                "कुल विद्यार्थी (Students Count)": len(c_df),
+                                "प्रथम विद्यार्थी": c_df.iloc[0]["Name"] if not c_df.empty else "--",
+                                "अंतिम विद्यार्थी": c_df.iloc[-1]["Name"] if not c_df.empty else "--",
+                                "स्थिति": "🟢 इम्पोर्ट हेतु तैयार"
+                            })
+                        st.dataframe(pd.DataFrame(preview_summary), use_container_width=True)
+
+                        c_act1, c_act2 = st.columns([2.5, 1.5])
+                        with c_act1:
+                            if st.button("🚀 सभी कक्षाओं का पूरा डेटा एक बार में बल्क इम्पोर्ट करें (Import All Classes Now)", type="primary", use_container_width=True, key="btn_bulk_import_all_classes"):
+                                for c_name, c_df in parsed_classes_dict.items():
+                                    if c_name not in st.session_state.classes_list:
+                                        st.session_state.classes_list.append(c_name)
+                                    target_c_data = get_class_data(c_name)
+                                    target_c_data["students"] = c_df
+                                    if "evaluations" not in target_c_data:
+                                        target_c_data["evaluations"] = {}
+                                save_data_to_disk()
+                                st.session_state.selected_class = list(parsed_classes_dict.keys())[0]
+                                st.balloons()
+                                st.success(f"🎉 **बधाई!** कुल **{len(parsed_classes_dict)} कक्षाओं** के **{tot_students_found} विद्यार्थी** एक बार में बल्क में सफलतापूर्वक सुरक्षित कर दिए गए हैं!")
+                                st.rerun()
+                        with c_act2:
+                            if selected_class in parsed_classes_dict:
+                                if st.button(f"📥 केवल {selected_class} ({len(parsed_classes_dict[selected_class])} छात्र) इम्पोर्ट करें", use_container_width=True, key=f"btn_import_single_{selected_class}"):
+                                    cls_data["students"] = parsed_classes_dict[selected_class]
+                                    save_data_to_disk()
+                                    st.success(f"✅ केवल {selected_class} के {len(parsed_classes_dict[selected_class])} छात्र सुरक्षित किए गए!")
+                                    st.rerun()
+                            else:
+                                st.caption(f"ℹ️ चुनी गई {selected_class} इस एक्सेल में नहीं पाई गई।")
+                    else:
+                        st.warning("⚠️ एक्सेल फ़ाइल में विद्यार्थी रिकॉर्ड नहीं पहचाने जा सके। कृपया हेडर पंक्ति ('Name', 'Roll No', 'Scholar No') जांचें।")
+
                 except Exception as e:
                     st.error(f"❌ एक्सेल फ़ाइल आयात करने में त्रुटि: {e}")
 
