@@ -1028,8 +1028,10 @@ def parse_sheet_students_robust(raw_df, target_class):
             col_map["PAN_No"] = c
         elif "APAAR_ID" not in col_map and any(k in comb for k in ["apaar", "apar", "apaar id", "apaar_id", "apar id", "apaar no", "edulocker"]):
             col_map["APAAR_ID"] = c
-        elif "Attendance" not in col_map and any(k in comb for k in ["attendance", "working days", "उपस्थिति", "कार्य दिवस", "हाजिरी", "attend", "working_days"]):
-            col_map["Attendance"] = c
+        elif any(k in comb for k in ["attendance", "working days", "उपस्थिति", "कार्य दिवस", "हाजिरी", "working_days"]) or comb.strip() == "attend":
+            if not any(ex in comb for ex in ["absent", "अनुपस्थिति", "leave", "छुट्टी"]):
+                # Always prioritize the right-most Annual Attendance column over any earlier quarterly/monthly attendance column
+                col_map["Attendance"] = c
 
     # Fallback pattern scan for Attendance if not found in header
     if "Attendance" not in col_map:
