@@ -952,12 +952,12 @@ def parse_sheet_students_robust(raw_df, target_class):
     col_map = {}
     for idx, col in enumerate(headers):
         cl = col.lower()
-        if any(k in cl for k in ["student's name", "name of student", "student name", "विद्यार्थी का नाम", "छात्र का नाम"]):
-            col_map["Name"] = idx
-        elif any(k in cl for k in ["father's name", "father name", "पिता का नाम", "pita"]):
+        if any(k in cl for k in ["father's name", "father name", "पिता का नाम", "pita"]):
             col_map["Father_Name"] = idx
         elif any(k in cl for k in ["mother's name", "mother name", "माता का नाम", "mata"]):
             col_map["Mother_Name"] = idx
+        elif any(k in cl for k in ["student's name", "name of student", "student name", "विद्यार्थी का नाम", "छात्र का नाम"]) or (cl == "name" and not any(ex in cl for ex in ["father", "mother", "school", "vidyalaya"])):
+            col_map["Name"] = idx
         elif any(k in cl for k in ["roll no", "roll  no.", "roll", "अनुक्रमांक"]):
             col_map["Roll_No"] = idx
         elif any(k in cl for k in ["scholar number", "scholar no", "scholar", "दाखिला"]):
@@ -972,6 +972,10 @@ def parse_sheet_students_robust(raw_df, target_class):
             col_map["SSSM_ID"] = idx
         elif any(k in cl for k in ["aadhaar no", "aadhar no", "aadhar", "आधार"]):
             col_map["Aadhar_No"] = idx
+        elif any(k in cl for k in ["pen", "pan", "pan_no", "pen_no", "pan no", "pen no", "permanent education"]):
+            col_map["PAN_No"] = idx
+        elif any(k in cl for k in ["apaar", "apar", "apaar id", "apaar_id", "apar id", "apaar no"]):
+            col_map["APAAR_ID"] = idx
         elif any(k in cl for k in ["attendance/school", "attendance", "उपस्थिति"]):
             col_map["Attendance"] = idx
 
@@ -1028,6 +1032,8 @@ def parse_sheet_students_robust(raw_df, target_class):
         
         samagra_val = clean_val("SSSM_ID", "")
         aadhar_val = clean_val("Aadhar_No", "")
+        pen_val = clean_val("PAN_No", "")
+        apaar_val = clean_val("APAAR_ID", "")
         
         att_raw = clean_val("Attendance", "200/220")
         att_days, tot_days = 200, 220
@@ -1051,6 +1057,8 @@ def parse_sheet_students_robust(raw_df, target_class):
             "Category": cat_val,
             "SSSM_ID": samagra_val,
             "Aadhar_No": aadhar_val,
+            "PAN_No": pen_val,
+            "APAAR_ID": apaar_val,
             "Medium": "English" if any(k in target_class.lower() for k in ["nursery", "lkg", "ukg", "1st", "2nd"]) else "Hindi",
             "Status": "Present",
             "Attended_Days": att_days,
@@ -1970,7 +1978,7 @@ def reorder_student_columns(df):
             mask = (df["APAAR_ID"].isna() | (df["APAAR_ID"].astype(str).str.strip().isin(["", "nan", "None"])))
             df.loc[mask, "APAAR_ID"] = df.loc[mask, c].fillna("").astype(str)
             df.drop(columns=[c], inplace=True)
-        if any(k in c_clean for k in ["pan", "panno", "pancard"]) and c != "PAN_No":
+        if any(k in c_clean for k in ["pen", "pan", "panno", "pancard", "penno"]) and c != "PAN_No":
             mask = (df["PAN_No"].isna() | (df["PAN_No"].astype(str).str.strip().isin(["", "nan", "None"])))
             df.loc[mask, "PAN_No"] = df.loc[mask, c].fillna("").astype(str)
             df.drop(columns=[c], inplace=True)
@@ -3290,7 +3298,7 @@ elif menu == T["nav_student"]:
                 "Category": st.column_config.SelectboxColumn("Category", options=["General", "OBC", "SC", "ST"]),
                 "SSSM_ID": st.column_config.TextColumn("Samagra ID"),
                 "Aadhar_No": st.column_config.TextColumn("Aadhar Number"),
-                "PAN_No": st.column_config.TextColumn("PAN Number"),
+                "PAN_No": st.column_config.TextColumn("PEN / PAN Number"),
                 "APAAR_ID": st.column_config.TextColumn("APAAR ID"),
                 "Medium": st.column_config.SelectboxColumn("Medium", options=ALL_MEDIUMS),
                 "Status": st.column_config.SelectboxColumn("Status", options=["Present", "Absent"]),
