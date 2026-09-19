@@ -301,7 +301,8 @@ def generate_rskmp_df(students_df, evaluations, cls_subjects, school_info, selec
     return pd.DataFrame(rows)
 
 def generate_mpbse_df(students_df, evaluations, cls_subjects, school_info, selected_class):
-    """Generates official MPBSE (mpbse.nic.in / MP Online) board upload template"""
+    """Generates official MPBSE (mpbse.mponline.gov.in) High School bulk upload template"""
+    cur_sess = school_info.get("session", "2026-27")
     rows = []
     for idx, s in students_df.iterrows():
         r = s["Roll_No"]
@@ -309,10 +310,11 @@ def generate_mpbse_df(students_df, evaluations, cls_subjects, school_info, selec
         m_dict = ev.get("marks", {})
         row = {
             "SCHOOL_DISE": school_info.get("udise", ""),
-            "ACADEMIC_YEAR": school_info.get("session", "2023-24"),
+            "ACADEMIC_SESSION": cur_sess,
             "CLASS": selected_class,
             "ROLL_NO": r,
             "SCHOLAR_NO": s.get("Scholar_No", ""),
+            "SAMAGRA_ID": s.get("SSSM_ID", ""),
             "STUDENT_NAME": s.get("Name", ""),
             "FATHER_NAME": s.get("Father_Name", ""),
             "MOTHER_NAME": s.get("Mother_Name", ""),
@@ -323,86 +325,149 @@ def generate_mpbse_df(students_df, evaluations, cls_subjects, school_info, selec
         }
         tot_m = 0
         all_pass = True
+        failed_count = 0
         for i, sub in enumerate(cls_subjects, 1):
             s_id = sub["id"]
             se = m_dict.get(s_id, {})
-            t = se.get("total", 75)
+            w_q = se.get("quarterly_5%", 4)
+            w_hy = se.get("half_yearly_5%", 4)
+            proj = se.get("project", 15)
+            ia = se.get("internal_assessment", w_q + w_hy + proj)
+            yr = se.get("annual", 55)
+            t = se.get("total", min(100, ia + yr))
             tot_m += t
-            if t < 33: all_pass = False
-            row[f"SUB{i}_{sub['name']}_MARKS"] = t
+            if ia < 8 or yr < 25 or t < 33:
+                all_pass = False
+                failed_count += 1
+            row[f"SUB{i}_{sub['name']}_IA_25"] = ia
+            row[f"SUB{i}_{sub['name']}_THEORY_75"] = yr
+            row[f"SUB{i}_{sub['name']}_TOTAL_100"] = t
             row[f"SUB{i}_GRADE"] = se.get("grade", calculate_grade(t))
         
+        max_m = len(cls_subjects) * 100
+        pct = round((tot_m / max_m)*100, 1) if max_m else 0
         row["TOTAL_MARKS"] = tot_m
-        row["MAX_MARKS"] = len(cls_subjects) * 100
-        row["PERCENTAGE"] = round((tot_m / (len(cls_subjects)*100))*100, 1) if cls_subjects else 0
-        row["RESULT"] = "PASS" if (all_pass and row["PERCENTAGE"] >= 33) else "FAIL"
-        row["DIVISION"] = calculate_division(row["PERCENTAGE"])
+        row["MAX_MARKS"] = max_m
+        row["PERCENTAGE"] = pct
+        
+        if all_pass and pct >= 33:
+            row["RESULT"] = "PASS"
+            row["DIVISION"] = "1st Division" if pct >= 60 else ("2nd Division" if pct >= 45 else "3rd Division")
+        elif failed_count <= 2 and pct >= 25:
+            row["RESULT"] = "SUPPLEMENTARY"
+            row["DIVISION"] = "SUPPLE"
+        else:
+            row["RESULT"] = "FAIL"
+            row["DIVISION"] = "FAIL"
+            
         rows.append(row)
     return pd.DataFrame(rows)
 
 def generate_master_44col_df(students_df, evaluations, cls_subjects, school_info, selected_class):
-    """Generates the exact 44-column master tabulation sheet"""
+    """Generates the official master tabulation sheet dynamically tailored for:
+    1. MPBSE 9th/10th (25 Internal Assessment + 75 Board Theory = 100)
+    2. RSKMP 5th/8th Board (20 Half-Yearly + 20 Project + 60 Annual Written = 100)
+    3. RSKMP 1-4 & 6-7 Local (40 Half-Yearly + 60 Annual Written = 100)
+    """
+    clean_cls = str(selected_class).lower().strip()
+    is_9_10 = any(k in clean_cls for k in ["class 9", "class 10", "9th", "10th", "कक्षा 9", "कक्षा 10"])
+    is_5_8 = any(k in clean_cls for k in ["class 5", "class 8", "5th", "8th", "कक्षा 5", "कक्षा 8"])
+    
     rows = []
     for idx, s in students_df.iterrows():
         r = s["Roll_No"]
         ev = evaluations.get(r, {})
         m_dict = ev.get("marks", {})
         row = {
-            "1_Sr_No": idx + 1,
-            "2_Roll_No": r,
-            "3_Scholar_No": s.get("Scholar_No", ""),
-            "4_Student_Name": s.get("Name", ""),
-            "5_Mother_Name": s.get("Mother_Name", ""),
-            "6_Father_Name": s.get("Father_Name", ""),
-            "7_DOB": s.get("DOB", ""),
-            "8_Gender": s.get("Gender", ""),
-            "9_Category": s.get("Category", ""),
-            "10_Samagra_ID": s.get("SSSM_ID", ""),
-            "11_Aadhar_No": s.get("Aadhar_No", "")
+            "Sr_No": idx + 1,
+            "Roll_No": r,
+            "Scholar_No": s.get("Scholar_No", ""),
+            "Student_Name": s.get("Name", ""),
+            "Mother_Name": s.get("Mother_Name", ""),
+            "Father_Name": s.get("Father_Name", ""),
+            "DOB": s.get("DOB", ""),
+            "Gender": s.get("Gender", ""),
+            "Category": s.get("Category", ""),
+            "Samagra_ID": s.get("SSSM_ID", ""),
+            "Aadhar_No": s.get("Aadhar_No", "")
         }
-        for i, sub in enumerate(cls_subjects):
-            s_eval = m_dict.get(sub["id"], {})
-            row[f"{12+i}_HY_{sub['name']}"] = s_eval.get("half_yearly", 32)
-        for i, sub in enumerate(cls_subjects):
-            s_eval = m_dict.get(sub["id"], {})
-            row[f"{16+i}_Annual_{sub['name']}"] = s_eval.get("annual", 48)
+        
         tot_m = 0
         all_pass = True
-        for i, sub in enumerate(cls_subjects):
-            s_eval = m_dict.get(sub["id"], {})
-            t = s_eval.get("total", 80)
-            tot_m += t
-            if t < 33: all_pass = False
-            row[f"{20+i}_Final_{sub['name']}"] = t
-            
-        pct = round((tot_m / (len(cls_subjects)*100))*100, 1) if cls_subjects else 0
+        
+        if is_9_10:
+            # MPBSE Format
+            for i, sub in enumerate(cls_subjects, 1):
+                se = m_dict.get(sub["id"], {})
+                w_q = se.get("quarterly_5%", 4)
+                w_hy = se.get("half_yearly_5%", 4)
+                proj = se.get("project", 15)
+                ia = se.get("internal_assessment", w_q + w_hy + proj)
+                yr = se.get("annual", 55)
+                tot = se.get("total", min(100, ia + yr))
+                tot_m += tot
+                if ia < 8 or yr < 25 or tot < 33:
+                    all_pass = False
+                row[f"{sub['name']}_आंतरिक[25]"] = ia
+                row[f"{sub['name']}_लिखित[75]"] = yr
+                row[f"{sub['name']}_कुल[100]"] = tot
+                row[f"{sub['name']}_ग्रेड"] = se.get("grade", calculate_grade(tot))
+        elif is_5_8:
+            # RSKMP 5th & 8th Board Format
+            for i, sub in enumerate(cls_subjects, 1):
+                se = m_dict.get(sub["id"], {})
+                hy = se.get("half_yearly", 16)
+                pj = se.get("project", 16)
+                yr = se.get("annual", 48)
+                tot = se.get("total", hy + pj + yr)
+                tot_m += tot
+                if hy < 7 or pj < 7 or yr < 20 or tot < 33:
+                    all_pass = False
+                row[f"{sub['name']}_अर्धवार्षिक[20]"] = hy
+                row[f"{sub['name']}_प्रोजेक्ट[20]"] = pj
+                row[f"{sub['name']}_वार्षिक[60]"] = yr
+                row[f"{sub['name']}_कुल[100]"] = tot
+                row[f"{sub['name']}_ग्रेड"] = se.get("grade", calculate_grade(tot))
+        else:
+            # RSKMP Local Classes (1-4, 6-7)
+            for i, sub in enumerate(cls_subjects, 1):
+                se = m_dict.get(sub["id"], {})
+                hy = se.get("half_yearly", 32)
+                yr = se.get("annual", 48)
+                tot = se.get("total", hy + yr)
+                tot_m += tot
+                if hy < 13 or yr < 20 or tot < 33:
+                    all_pass = False
+                row[f"{sub['name']}_अर्धवार्षिक[40]"] = hy
+                row[f"{sub['name']}_वार्षिक[60]"] = yr
+                row[f"{sub['name']}_कुल[100]"] = tot
+                row[f"{sub['name']}_ग्रेड"] = se.get("grade", calculate_grade(tot))
+                
+        max_possible = len(cls_subjects) * 100
+        pct = round((tot_m / max_possible) * 100, 1) if max_possible else 0
         is_pass = (all_pass and pct >= 33)
         
-        row["24_Total_Obtained"] = tot_m
-        row["25_Result"] = "Pass" if is_pass else "Fail"
-        row["26_Percentage"] = f"{pct}%"
-        row["27_Grade"] = calculate_grade(pct)
-        row["28_Rank"] = idx + 1
-        row["29_Attendance"] = f"{s.get('Attended_Days', 200)}/{s.get('Total_Days', 220)}"
+        row["Grand_Total"] = f"{tot_m}/{max_possible}"
+        row["Result"] = "Pass" if is_pass else ("Supple" if not all_pass and pct >= 25 else "Fail")
+        row["Percentage"] = f"{pct}%"
+        if is_9_10:
+            row["Division"] = "1st Division" if pct >= 60 else ("2nd Division" if pct >= 45 else ("3rd Division" if pct >= 33 else "Fail"))
+        else:
+            row["Grade"] = calculate_grade(pct)
+        row["Rank"] = idx + 1
+        row["Attendance"] = f"{s.get('Attended_Days', 200)}/{s.get('Total_Days', 220)}"
         
         co = ev.get("co_curricular", {})
-        row["30_LITERARY_SKILLS"] = co.get("LITERARY_SKILLS", "A")
-        row["31_SCIENTIFIC_SKILLS"] = co.get("SCIENTIFIC_SKILLS", "A")
-        row["32_CULTURAL_SKILLS"] = co.get("CULTURAL_SKILLS", "A")
-        row["33_CREATIVITY"] = co.get("CREATIVITY", "A")
-        row["34_SPORTS"] = co.get("SPORTS", "A")
+        row["LITERARY_SKILLS"] = co.get("LITERARY_SKILLS", "A")
+        row["SCIENTIFIC_SKILLS"] = co.get("SCIENTIFIC_SKILLS", "A")
+        row["CULTURAL_SKILLS"] = co.get("CULTURAL_SKILLS", "A")
+        row["CREATIVITY"] = co.get("CREATIVITY", "A")
+        row["SPORTS"] = co.get("SPORTS", "A")
         
         soc = ev.get("social", {})
-        row["35_REGULARITY"] = soc.get("REGULARITY", "A")
-        row["36_PUNCTUALITY"] = soc.get("PUNCTUALITY", "A")
-        row["37_CLEANLINESS"] = soc.get("CLEANLINESS", "A")
-        row["38_DISCIPLINE"] = soc.get("DISCIPLINE", "A")
-        row["39_COOPERATION"] = soc.get("COOPERATION", "A")
-        row["40_ENV_CONS"] = soc.get("ENV_CONSCIOUSNESS", "A")
-        row["41_LEADERSHIP"] = soc.get("LEADERSHIP", "B")
-        row["42_TRUTHFULNESS"] = soc.get("TRUTHFULNESS", "A")
-        row["43_HONESTY"] = soc.get("HONESTY", "A")
-        row["44_EXPRESSIVE"] = soc.get("EXPRESSIVE", "C")
+        row["DISCIPLINE"] = soc.get("DISCIPLINE", "A")
+        row["CLEANLINESS"] = soc.get("CLEANLINESS", "A")
+        row["COOPERATION"] = soc.get("COOPERATION", "A")
         
         rows.append(row)
     return pd.DataFrame(rows)
@@ -575,6 +640,240 @@ def generate_whatsapp_result_link(student_name, roll_no, cls_name, grand_obt, ma
     else:
         wa_url = f"https://wa.me/?text={encoded}"
     return wa_url, msg
+
+# ----------------- OFFICIAL GOVERNMENT PORTAL TEMPLATE GENERATORS -----------------
+
+def generate_portal_student_master_df(students_df, school_info, selected_class):
+    """Official Student Master for RSKMP (rskmp.in) Verification and MPBSE Enrollment"""
+    rows = []
+    clean_cls = str(selected_class).lower()
+    for idx, s in students_df.iterrows():
+        rows.append({
+            "DISE_CODE": school_info.get("udise", ""),
+            "CLASS": selected_class,
+            "SAMAGRA_ID": s.get("SSSM_ID", ""),
+            "SCHOLAR_NO": s.get("Scholar_No", ""),
+            "ROLL_NO": s.get("Roll_No", idx + 1),
+            "STUDENT_NAME": s.get("Name", ""),
+            "FATHER_NAME": s.get("Father_Name", ""),
+            "MOTHER_NAME": s.get("Mother_Name", ""),
+            "DOB": s.get("DOB", ""),
+            "GENDER": s.get("Gender", ""),
+            "CATEGORY": s.get("Category", ""),
+            "CWSN": s.get("CWSN", "No"),
+            "MEDIUM": s.get("Medium", "Hindi"),
+            "AADHAR_NO": s.get("Aadhar_No", ""),
+            "MOBILE": s.get("Mobile", ""),
+            "SECTION": s.get("Section", "A"),
+            "STATUS": s.get("Status", "Present")
+        })
+    return pd.DataFrame(rows)
+
+
+def generate_portal_half_yearly_df(students_df, evaluations, cls_subjects, school_info, selected_class):
+    """Official Half-Yearly Marks Upload for RSKMP (20/40) & MPBSE (75 -> 5%)"""
+    clean_cls = str(selected_class).lower()
+    is_9_10 = any(k in clean_cls for k in ["class 9", "class 10", "9th", "10th", "कक्षा 9", "कक्षा 10"])
+    is_5_8 = any(k in clean_cls for k in ["class 5", "class 8", "5th", "8th", "कक्षा 5", "कक्षा 8"])
+    
+    rows = []
+    for idx, s in students_df.iterrows():
+        r = s["Roll_No"]
+        ev = evaluations.get(r, {})
+        m_dict = ev.get("marks", {})
+        row = {
+            "DISE_CODE": school_info.get("udise", ""),
+            "CLASS": selected_class,
+            "SAMAGRA_ID": s.get("SSSM_ID", ""),
+            "SCHOLAR_NO": s.get("Scholar_No", ""),
+            "ROLL_NO": r,
+            "STUDENT_NAME": s.get("Name", ""),
+            "FATHER_NAME": s.get("Father_Name", ""),
+            "GENDER": s.get("Gender", ""),
+            "CATEGORY": s.get("Category", "")
+        }
+        tot_hy = 0
+        for sub in cls_subjects:
+            se = m_dict.get(sub["id"], {})
+            if is_9_10:
+                raw_75 = se.get("half_yearly", 55)
+                w_5 = se.get("half_yearly_5%", calculate_subject_quarterly_weightage(raw_75, 75))
+                row[f"{sub['name']}_छमाही[75]"] = raw_75
+                row[f"{sub['name']}_अधिभार[5]"] = w_5
+                tot_hy += w_5
+            elif is_5_8:
+                h_20 = se.get("half_yearly", 16)
+                row[f"{sub['name']}_अर्धवार्षिक[20]"] = h_20
+                tot_hy += h_20
+            else:
+                h_40 = se.get("half_yearly", 32)
+                row[f"{sub['name']}_अर्धवार्षिक[40]"] = h_40
+                tot_hy += h_40
+                
+        row["TOTAL_HALF_YEARLY"] = tot_hy
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def generate_portal_project_df(students_df, evaluations, cls_subjects, school_info, selected_class):
+    """Official Project Marks Upload for RSKMP (20) & MPBSE (15/25)"""
+    clean_cls = str(selected_class).lower()
+    is_9_10 = any(k in clean_cls for k in ["class 9", "class 10", "9th", "10th", "कक्षा 9", "कक्षा 10"])
+    is_5_8 = any(k in clean_cls for k in ["class 5", "class 8", "5th", "8th", "कक्षा 5", "कक्षा 8"])
+    
+    rows = []
+    for idx, s in students_df.iterrows():
+        r = s["Roll_No"]
+        ev = evaluations.get(r, {})
+        m_dict = ev.get("marks", {})
+        row = {
+            "DISE_CODE": school_info.get("udise", ""),
+            "CLASS": selected_class,
+            "SAMAGRA_ID": s.get("SSSM_ID", ""),
+            "SCHOLAR_NO": s.get("Scholar_No", ""),
+            "ROLL_NO": r,
+            "STUDENT_NAME": s.get("Name", ""),
+            "FATHER_NAME": s.get("Father_Name", ""),
+            "GENDER": s.get("Gender", "")
+        }
+        tot_pj = 0
+        for sub in cls_subjects:
+            se = m_dict.get(sub["id"], {})
+            if is_9_10:
+                p_15 = se.get("project", 15)
+                row[f"{sub['name']}_प्रोजेक्ट[15]"] = p_15
+                tot_pj += p_15
+            elif is_5_8:
+                p_20 = se.get("project", 16)
+                row[f"{sub['name']}_प्रोजेक्ट[20]"] = p_20
+                tot_pj += p_20
+            else:
+                p_raw = se.get("project", 32)
+                p_w = calculate_subject_project_weightage_rule(p_raw, selected_class)
+                row[f"{sub['name']}_प्रोजेक्ट[अधिभार]"] = p_w
+                tot_pj += p_w
+                
+        row["TOTAL_PROJECT_MARKS"] = tot_pj
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def generate_official_goshwara_summary_df(students_df, evaluations, cls_subjects, selected_class):
+    """Official Departmental Category-wise & Gender-wise Result Summary (Goshwara)"""
+    clean_cls = str(selected_class).lower()
+    is_9_10 = any(k in clean_cls for k in ["class 9", "class 10", "9th", "10th", "कक्षा 9", "कक्षा 10"])
+    is_5_8 = any(k in clean_cls for k in ["class 5", "class 8", "5th", "8th", "कक्षा 5", "कक्षा 8"])
+    
+    categories = ["GEN", "OBC", "SC", "ST"]
+    genders = ["Boy", "Girl"]
+    
+    # Precompute student results
+    st_results = []
+    for idx, s in students_df.iterrows():
+        r = s["Roll_No"]
+        ev = evaluations.get(r, {})
+        m_dict = ev.get("marks", {})
+        tot_m = 0
+        all_pass = True
+        
+        for sub in cls_subjects:
+            se = m_dict.get(sub["id"], {})
+            if is_9_10:
+                ia = se.get("internal_assessment", 23)
+                yr = se.get("annual", 55)
+                tot = se.get("total", ia + yr)
+                tot_m += tot
+                if ia < 8 or yr < 25 or tot < 33: all_pass = False
+            elif is_5_8:
+                h = se.get("half_yearly", 16)
+                p = se.get("project", 16)
+                yr = se.get("annual", 48)
+                tot = se.get("total", h + p + yr)
+                tot_m += tot
+                if h < 7 or p < 7 or yr < 20 or tot < 33: all_pass = False
+            else:
+                h = se.get("half_yearly", 32)
+                yr = se.get("annual", 48)
+                tot = se.get("total", h + yr)
+                tot_m += tot
+                if h < 13 or yr < 20 or tot < 33: all_pass = False
+                
+        max_m = len(cls_subjects) * 100
+        pct = round((tot_m / max_m) * 100, 1) if max_m else 0
+        is_p = (all_pass and pct >= 33)
+        grd = calculate_grade(pct)
+        st_results.append({
+            "Category": str(s.get("Category", "GEN")).upper().strip(),
+            "Gender": str(s.get("Gender", "Boy")).strip(),
+            "Status": ev.get("status", s.get("Status", "Present")),
+            "IsPass": is_p,
+            "Percentage": pct,
+            "Grade": grd
+        })
+        
+    g_df = pd.DataFrame(st_results)
+    
+    summary_rows = []
+    for cat in categories:
+        for gen in genders:
+            subset = g_df[(g_df["Category"] == cat) & (g_df["Gender"] == gen)] if not g_df.empty else pd.DataFrame()
+            reg = len(subset)
+            app = len(subset[subset["Status"] != "Absent"]) if reg > 0 else 0
+            passed = len(subset[subset["IsPass"] == True]) if reg > 0 else 0
+            pct_val = round((passed / app) * 100, 1) if app > 0 else 0.0
+            
+            row = {
+                "वर्ग (Category)": cat,
+                "लिंग (Gender)": "छात्र (Boys)" if gen == "Boy" else "छात्रा (Girls)",
+                "पंजीकृत (Reg)": reg,
+                "सम्मिलित (App)": app,
+                "उत्तीर्ण (Pass)": passed,
+                "उत्तीर्ण %": f"{pct_val}%"
+            }
+            if is_9_10:
+                row["प्रथम श्रेणी (I Div)"] = len(subset[(subset["IsPass"] == True) & (subset["Percentage"] >= 60)]) if reg > 0 else 0
+                row["द्वितीय श्रेणी (II Div)"] = len(subset[(subset["IsPass"] == True) & (subset["Percentage"] >= 45) & (subset["Percentage"] < 60)]) if reg > 0 else 0
+                row["तृतीय श्रेणी (III Div)"] = len(subset[(subset["IsPass"] == True) & (subset["Percentage"] >= 33) & (subset["Percentage"] < 45)]) if reg > 0 else 0
+                row["पूरक (Supple)"] = app - passed
+            else:
+                row["Grade A+"] = len(subset[subset["Grade"] == "A+"]) if reg > 0 else 0
+                row["Grade A"] = len(subset[subset["Grade"] == "A"]) if reg > 0 else 0
+                row["Grade B"] = len(subset[subset["Grade"] == "B"]) if reg > 0 else 0
+                row["Grade C"] = len(subset[subset["Grade"] == "C"]) if reg > 0 else 0
+                row["Grade D"] = len(subset[subset["Grade"] == "D"]) if reg > 0 else 0
+                row["Grade E (पुनः परीक्षा)"] = len(subset[subset["Grade"] == "E"]) if reg > 0 else 0
+                
+            summary_rows.append(row)
+            
+    # Total Row
+    tot_reg = sum(r["पंजीकृत (Reg)"] for r in summary_rows)
+    tot_app = sum(r["सम्मिलित (App)"] for r in summary_rows)
+    tot_pass = sum(r["उत्तीर्ण (Pass)"] for r in summary_rows)
+    tot_pct = round((tot_pass / tot_app) * 100, 1) if tot_app > 0 else 0.0
+    
+    total_row = {
+        "वर्ग (Category)": "महायोग (TOTAL)",
+        "लिंग (Gender)": "समस्त छात्र/छात्राएं",
+        "पंजीकृत (Reg)": tot_reg,
+        "सम्मिलित (App)": tot_app,
+        "उत्तीर्ण (Pass)": tot_pass,
+        "उत्तीर्ण %": f"{tot_pct}%"
+    }
+    if is_9_10:
+        total_row["प्रथम श्रेणी (I Div)"] = sum(r["प्रथम श्रेणी (I Div)"] for r in summary_rows)
+        total_row["द्वितीय श्रेणी (II Div)"] = sum(r["द्वितीय श्रेणी (II Div)"] for r in summary_rows)
+        total_row["तृतीय श्रेणी (III Div)"] = sum(r["तृतीय श्रेणी (III Div)"] for r in summary_rows)
+        total_row["पूरक (Supple)"] = sum(r["पूरक (Supple)"] for r in summary_rows)
+    else:
+        total_row["Grade A+"] = sum(r["Grade A+"] for r in summary_rows)
+        total_row["Grade A"] = sum(r["Grade A"] for r in summary_rows)
+        total_row["Grade B"] = sum(r["Grade B"] for r in summary_rows)
+        total_row["Grade C"] = sum(r["Grade C"] for r in summary_rows)
+        total_row["Grade D"] = sum(r["Grade D"] for r in summary_rows)
+        total_row["Grade E (पुनः परीक्षा)"] = sum(r["Grade E (पुनः परीक्षा)"] for r in summary_rows)
+        
+    summary_rows.append(total_row)
+    return pd.DataFrame(summary_rows)
 
 def render_govt_portals_hub(tab_title, target_class, export_df=None, default_file_name="Portal_Upload"):
     cur_role = st.session_state.get("authenticated_role", "PRINCIPAL")
@@ -3143,7 +3442,8 @@ elif menu == T["nav_student"]:
 
     # Govt Portals Hub & Principal Download for Student Master
     if not students_df.empty:
-        render_govt_portals_hub("विद्यार्थी मास्टर", selected_class, students_df, f"Student_Master_{selected_class}")
+        p_stu_df = generate_portal_student_master_df(students_df, st.session_state.school_info, selected_class)
+        render_govt_portals_hub("विद्यार्थी मास्टर (RSKMP / MPBSE छात्र पंजीयन)", selected_class, p_stu_df, f"Student_Master_Portal_{selected_class}")
 
 # ----------------- MODULE 3: DUAL ATTENDANCE REGISTER -----------------
 elif menu == T["nav_attendance"]:
@@ -3607,7 +3907,8 @@ elif menu == T.get("nav_half_yearly", "📑 7. अर्धवार्षिक
             st.rerun()
 
         # Govt Portals Hub & Principal Download for Half-Yearly
-        render_govt_portals_hub("अर्धवार्षिक परीक्षा मूल्यांकन", selected_class, pd.DataFrame(hy_rows), f"Half_Yearly_Exam_{selected_class}")
+        p_hy_df = generate_portal_half_yearly_df(students_df, hy_evals, cls_subjects, st.session_state.school_info, selected_class)
+        render_govt_portals_hub("अर्धवार्षिक परीक्षा (RSKMP व MPBSE पोर्टल प्रविष्टि)", selected_class, p_hy_df, f"Half_Yearly_Portal_{selected_class}")
 
 # ----------------- MODULE 8: ANNUAL PROJECT WORK EVALUATION -----------------
 elif menu == T.get("nav_project", "🎨 8. वार्षिक प्रोजेक्ट कार्य मूल्यांकन (Project Work — 10%/20 अंक)"):
@@ -3648,7 +3949,8 @@ elif menu == T.get("nav_project", "🎨 8. वार्षिक प्रोज
             st.rerun()
 
         # Govt Portals Hub & Principal Download for Project Work
-        render_govt_portals_hub("वार्षिक प्रोजेक्ट कार्य", selected_class, pd.DataFrame(pj_rows), f"Project_Work_{selected_class}")
+        p_pj_df = generate_portal_project_df(students_df, pj_evals, cls_subjects, st.session_state.school_info, selected_class)
+        render_govt_portals_hub("वार्षिक प्रोजेक्ट कार्य (RSKMP व MPBSE पोर्टल प्रविष्टि)", selected_class, p_pj_df, f"Project_Work_Portal_{selected_class}")
 
 # ----------------- MODULE 9: PRINT MARKSHEET (SHASHKIY PRAGATI PATRAK) & PORTAL HUB -----------------
 elif menu == T.get("nav_marksheet", "🖨️ 9. शासकीय वार्षिक प्रगति पत्रक एवं RSKMP/MPBSE पोर्टल केंद्र"):
@@ -3878,18 +4180,36 @@ elif menu == T.get("nav_marksheet", "🖨️ 9. शासकीय वार्�
 elif menu == T["nav_a3_result"]:
     students_df = cls_data["students"]
     s_info = st.session_state.school_info
+    cur_sess = s_info.get("session", "2026-27")
     cls_subjects = get_class_subjects(selected_class)
     sub_count = len(cls_subjects)
     max_total = sub_count * 100
 
-    cur_exam_rule = get_session_exam_rule(s_info.get("session", "2026-27"), selected_class)
-    has_proj_comp = any(c["id"] == "project" for c in cur_exam_rule["components"])
+    clean_cls = str(selected_class).lower().strip()
+    is_9_10 = any(k in clean_cls for k in ["class 9", "class 10", "9th", "10th", "कक्षा 9", "कक्षा 10"])
+    is_5_8 = any(k in clean_cls for k in ["class 5", "class 8", "5th", "8th", "कक्षा 5", "कक्षा 8"])
+
+    # Header and Rules according to Government Authority
+    if is_9_10:
+        board_authority_title = "MADHYA PRADESH BOARD OF SECONDARY EDUCATION (MPBSE), BHOPAL"
+        sheet_title = f"HIGH SCHOOL ANNUAL EXAMINATION RESULT SHEET (A-3 TABULATION REGISTER) {cur_sess}"
+        rule_subtitle = "💡 <b>MPBSE शासकीय नियम:</b> 25 आंतरिक मूल्यांकन (त्रैमासिक 5% + छमाही 5% + प्रोजेक्ट 15) + 75 वार्षिक बोर्ड लिखित परीक्षा = 100 अंक (न्यूनतम उत्तीर्णांक: आंतरिक 8/25, लिखित 25/75, कुल 33/100)"
+    elif is_5_8:
+        board_authority_title = "RAJYA SHIKSHA KENDRA, MADHYA PRADESH (RSKMP), BHOPAL"
+        sheet_title = f"5वीं व 8वीं बोर्ड वार्षिक परीक्षाफल पत्रक (A-3 ANNUAL RESULT SHEET) {cur_sess}"
+        rule_subtitle = "💡 <b>RSKMP बोर्ड नियम:</b> 20 अर्धवार्षिक परीक्षा (20% अधिभार) + 20 वार्षिक प्रोजेक्ट कार्य + 60 वार्षिक लिखित परीक्षा = 100 अंक (न्यूनतम उत्तीर्णांक: अर्धवार्षिक 7/20, प्रोजेक्ट 7/20, लिखित 20/60, कुल 33/100)"
+    else:
+        board_authority_title = "RAJYA SHIKSHA KENDRA, MADHYA PRADESH (RSKMP)"
+        sheet_title = f"प्राथमिक / माध्यमिक स्थानीय वार्षिक परीक्षाफल पत्रक (A-3 ANNUAL RESULT SHEET) {cur_sess}"
+        rule_subtitle = "💡 <b>RSKMP स्थानीय परीक्षा नियम:</b> 40 अर्धवार्षिक परीक्षा + 60 वार्षिक परीक्षा = 100 अंक (न्यूनतम उत्तीर्णांक: अर्धवार्षिक 13/40, वार्षिक 20/60, कुल 33/100)"
 
     c_a3_top1, c_a3_top2 = st.columns([3, 1])
     with c_a3_top1:
-        render_html('<div style="border: 2px solid #008000; padding: 6px 14px; background: #fff; display: inline-block;"><span style="color: #CC0000; font-weight: 800; font-size: 14px;">*इस परीक्षाफल पत्रक को अनुमोदन हेतु A-3 साइज़ के पेपर पर प्रिंट करें</span></div>')
+        render_html(f'<div style="border: 2px solid #008000; padding: 6px 14px; background: #fff; display: inline-block;"><span style="color: #CC0000; font-weight: 800; font-size: 14px;">*इस परीक्षाफल पत्रक को आधिकारिक अनुमोदन हेतु A-3 साइज़ के पेपर पर प्रिंट करें</span></div>')
     with c_a3_top2:
         st.button("🖨️ Print A3 Sheet", use_container_width=True, type="primary")
+
+    st.info(rule_subtitle)
 
     student_rows_a3 = ""
     for idx, s in students_df.iterrows():
@@ -3897,33 +4217,87 @@ elif menu == T["nav_a3_result"]:
         ev = cls_data["evaluations"].get(r_no, {})
         tot_obt = 0
         all_p = True
-        hy_c, pr_c, yr_c, fn_c = "", "", "", ""
-        for sub in cls_subjects:
-            se = ev.get("marks", {}).get(sub["id"], {})
-            h = se.get("half_yearly", 16 if has_proj_comp else 32)
-            p = se.get("project", 16 if has_proj_comp else 0)
-            y = se.get("annual", 48)
-            t = se.get("total", (h + p + y) if has_proj_comp else (h + y))
-            tot_obt += t
-            
-            # Statutory Passing criteria
-            if has_proj_comp:
+        
+        c_sub_cols = ""
+        if is_9_10:
+            # MPBSE 9th-10th: 25 IA + 75 Written = 100
+            for sub in cls_subjects:
+                se = ev.get("marks", {}).get(sub["id"], {})
+                w_q = se.get("quarterly_5%", 4)
+                w_hy = se.get("half_yearly_5%", 4)
+                proj = se.get("project", 15)
+                ia = se.get("internal_assessment", w_q + w_hy + proj)
+                yr = se.get("annual", 55)
+                t = se.get("total", min(100, ia + yr))
+                tot_obt += t
+                if ia < 8 or yr < 25 or t < 33:
+                    all_p = False
+                c_sub_cols += f'<td style="border:1px solid #000; padding:2px;">{ia}</td>'
+            for sub in cls_subjects:
+                se = ev.get("marks", {}).get(sub["id"], {})
+                yr = se.get("annual", 55)
+                c_sub_cols += f'<td style="border:1px solid #000; padding:2px;">{yr}</td>'
+            for sub in cls_subjects:
+                se = ev.get("marks", {}).get(sub["id"], {})
+                w_q = se.get("quarterly_5%", 4)
+                w_hy = se.get("half_yearly_5%", 4)
+                proj = se.get("project", 15)
+                ia = se.get("internal_assessment", w_q + w_hy + proj)
+                yr = se.get("annual", 55)
+                t = se.get("total", min(100, ia + yr))
+                c_sub_cols += f'<td style="border:1px solid #000; padding:2px; font-weight:bold; color:green;">{t}</td>'
+        elif is_5_8:
+            # RSKMP 5th & 8th Board: 20 HY + 20 Proj + 60 Written = 100
+            for sub in cls_subjects:
+                se = ev.get("marks", {}).get(sub["id"], {})
+                h = se.get("half_yearly", 16)
+                c_sub_cols += f'<td style="border:1px solid #000; padding:2px;">{h}</td>'
+            for sub in cls_subjects:
+                se = ev.get("marks", {}).get(sub["id"], {})
+                p = se.get("project", 16)
+                c_sub_cols += f'<td style="border:1px solid #000; padding:2px;">{p}</td>'
+            for sub in cls_subjects:
+                se = ev.get("marks", {}).get(sub["id"], {})
+                y = se.get("annual", 48)
+                c_sub_cols += f'<td style="border:1px solid #000; padding:2px;">{y}</td>'
+            for sub in cls_subjects:
+                se = ev.get("marks", {}).get(sub["id"], {})
+                h = se.get("half_yearly", 16)
+                p = se.get("project", 16)
+                y = se.get("annual", 48)
+                t = se.get("total", h + p + y)
+                tot_obt += t
                 if h < 7 or p < 7 or y < 20 or t < 33:
                     all_p = False
-            else:
+                c_sub_cols += f'<td style="border:1px solid #000; padding:2px; font-weight:bold; color:green;">{t}</td>'
+        else:
+            # RSKMP Local: 40 HY + 60 Written = 100
+            for sub in cls_subjects:
+                se = ev.get("marks", {}).get(sub["id"], {})
+                h = se.get("half_yearly", 32)
+                c_sub_cols += f'<td style="border:1px solid #000; padding:2px;">{h}</td>'
+            for sub in cls_subjects:
+                se = ev.get("marks", {}).get(sub["id"], {})
+                y = se.get("annual", 48)
+                c_sub_cols += f'<td style="border:1px solid #000; padding:2px;">{y}</td>'
+            for sub in cls_subjects:
+                se = ev.get("marks", {}).get(sub["id"], {})
+                h = se.get("half_yearly", 32)
+                y = se.get("annual", 48)
+                t = se.get("total", h + y)
+                tot_obt += t
                 if h < 13 or y < 20 or t < 33:
                     all_p = False
-
-            hy_c += f'<td style="border:1px solid #000; padding:2px;">{h}</td>'
-            if has_proj_comp:
-                pr_c += f'<td style="border:1px solid #000; padding:2px;">{p}</td>'
-            yr_c += f'<td style="border:1px solid #000; padding:2px;">{y}</td>'
-            fn_c += f'<td style="border:1px solid #000; padding:2px; font-weight:bold; color:green;">{t}</td>'
+                c_sub_cols += f'<td style="border:1px solid #000; padding:2px; font-weight:bold; color:green;">{t}</td>'
 
         pct = round((tot_obt / max_total) * 100, 1) if max_total else 0
-        grd = calculate_grade(pct)
         is_p = (all_p and pct >= 33)
         res_col = "green" if is_p else "red"
+        
+        if is_9_10:
+            division_or_grade = "1st Div" if pct >= 60 else ("2nd Div" if pct >= 45 else ("3rd Div" if is_p else "Fail"))
+        else:
+            division_or_grade = calculate_grade(pct)
 
         student_rows_a3 += f"""
         <tr style="height:26px; font-size:11px; text-align:center;">
@@ -3938,102 +4312,113 @@ elif menu == T["nav_a3_result"]:
             <td style="border:1px solid #000;">{s['Category']}</td>
             <td style="border:1px solid #000;">{s['SSSM_ID']}</td>
             <td style="border:1px solid #000;">{s.get('Aadhar_No','')}</td>
-            {hy_c}{pr_c}{yr_c}{fn_c}
-            <td style="border:1px solid #000; font-weight:bold; color:green;">{tot_obt}</td>
+            {c_sub_cols}
+            <td style="border:1px solid #000; font-weight:bold; color:green;">{tot_obt}/{max_total}</td>
             <td style="border:1px solid #000; font-weight:bold; color:{res_col};">{'Pass' if is_p else 'Fail'}</td>
             <td style="border:1px solid #000; font-weight:bold; color:green;">{pct}%</td>
-            <td style="border:1px solid #000; font-weight:bold;">{grd}</td>
+            <td style="border:1px solid #000; font-weight:bold;">{division_or_grade}</td>
             <td style="border:1px solid #000;">{idx+1}</td>
             <td style="border:1px solid #000;">{s.get('Attended_Days',200)}/{s.get('Total_Days',220)}</td>
         </tr>
         """
 
-    sub_ths_hy = "".join([f'<th class="v-th-tall">{sub["name"]}</th>' for sub in cls_subjects])
-    sub_ths_pr = "".join([f'<th class="v-th-tall">{sub["name"]}</th>' for sub in cls_subjects]) if has_proj_comp else ""
-    sub_ths_yr = "".join([f'<th class="v-th-tall">{sub["name"]}</th>' for sub in cls_subjects])
-    sub_ths_fn = "".join([f'<th class="v-th-tall">{sub["name"]}</th>' for sub in cls_subjects])
-
-    if has_proj_comp:
+    # Dynamic headers per official standard
+    if is_9_10:
         a3_component_headers = f"""
-                    <th colspan="{sub_count}" style="border:1px solid #000;">Half Yearly [20]</th>
-                    <th colspan="{sub_count}" style="border:1px solid #000;">Project Work [20]</th>
-                    <th colspan="{sub_count}" style="border:1px solid #000;">Annual Written [60]</th>
-                    <th colspan="{sub_count}" style="border:1px solid #000;">Final Assessment [100]</th>
+                    <th colspan="{sub_count}" style="border:1px solid #000; background:#E0F2FE;">आंतरिक मूल्यांकन / Internal Assessment [25]</th>
+                    <th colspan="{sub_count}" style="border:1px solid #000; background:#FEF3C7;">वार्षिक बोर्ड लिखित / Board Written [75]</th>
+                    <th colspan="{sub_count}" style="border:1px solid #000; background:#DCFCE7;">विषय कुल प्राप्तांक / Subject Total [100]</th>
         """
+        sub_ths_single = "".join([f'<th class="v-th-tall">{sub["name"]}</th>' for sub in cls_subjects])
+        sub_ths_all = sub_ths_single * 3
+        grade_col_label = "श्रेणी (Division)"
+    elif is_5_8:
+        a3_component_headers = f"""
+                    <th colspan="{sub_count}" style="border:1px solid #000;">अर्धवार्षिक / Half Yearly [20]</th>
+                    <th colspan="{sub_count}" style="border:1px solid #000;">प्रोजेक्ट कार्य / Project Work [20]</th>
+                    <th colspan="{sub_count}" style="border:1px solid #000;">वार्षिक लिखित / Annual Written [60]</th>
+                    <th colspan="{sub_count}" style="border:1px solid #000; background:#DCFCE7;">अंतिम मूल्यांकन / Final Total [100]</th>
+        """
+        sub_ths_single = "".join([f'<th class="v-th-tall">{sub["name"]}</th>' for sub in cls_subjects])
+        sub_ths_all = sub_ths_single * 4
+        grade_col_label = "ग्रेड (Grade)"
     else:
         a3_component_headers = f"""
-                    <th colspan="{sub_count}" style="border:1px solid #000;">Half Yearly [40]</th>
-                    <th colspan="{sub_count}" style="border:1px solid #000;">Annual Written [60]</th>
-                    <th colspan="{sub_count}" style="border:1px solid #000;">Final Assessment [100]</th>
+                    <th colspan="{sub_count}" style="border:1px solid #000;">अर्धवार्षिक / Half Yearly [40]</th>
+                    <th colspan="{sub_count}" style="border:1px solid #000;">वार्षिक परीक्षा / Annual Written [60]</th>
+                    <th colspan="{sub_count}" style="border:1px solid #000; background:#DCFCE7;">अंतिम मूल्यांकन / Final Total [100]</th>
         """
+        sub_ths_single = "".join([f'<th class="v-th-tall">{sub["name"]}</th>' for sub in cls_subjects])
+        sub_ths_all = sub_ths_single * 3
+        grade_col_label = "ग्रेड (Grade)"
 
     a3_html = f"""
     <div class="printable-area a3-box">
-        <div style="font-size:22px; font-weight:900; margin-bottom:8px;">ANNUAL RESULT SHEET {s_info.get('session','2026-27')}</div>
+        <div style="text-align:center; margin-bottom:6px;">
+            <div style="font-size:13px; font-weight:bold; color:#1E3A8A;">{board_authority_title}</div>
+            <div style="font-size:20px; font-weight:900; color:#0F172A; text-transform:uppercase;">{sheet_title}</div>
+            <div style="font-size:12px; color:#475569;"><b>विद्यालय:</b> {s_info.get('name','')} | <b>UDISE:</b> {s_info.get('udise','')} | <b>कक्षा:</b> {selected_class} | <b>सत्र:</b> {cur_sess}</div>
+        </div>
         <table class="a3-table" style="width:100%; border-collapse:collapse; border:1px solid #000;">
             <thead>
                 <tr style="background:#f8fafc; font-weight:bold;">
-                    <th rowspan="2" class="v-th-tall">Sr.No.</th>
-                    <th rowspan="2" class="v-th-tall">Roll No.</th>
-                    <th rowspan="2" class="v-th-tall">Scholar No.</th>
-                    <th rowspan="2" style="border:1px solid #000; min-width:140px;">Name Of Student</th>
-                    <th rowspan="2" style="border:1px solid #000; min-width:110px;">Mother's Name</th>
-                    <th rowspan="2" style="border:1px solid #000; min-width:110px;">Father's Name</th>
-                    <th rowspan="2" style="border:1px solid #000; min-width:85px;">DOB</th>
-                    <th rowspan="2" class="v-th-tall">Gender</th>
-                    <th rowspan="2" class="v-th-tall">Category</th>
-                    <th rowspan="2" class="v-th-tall">Samagra ID</th>
-                    <th rowspan="2" style="border:1px solid #000; min-width:85px;">Aadhar No.</th>
+                    <th rowspan="2" class="v-th-tall">क्र.</th>
+                    <th rowspan="2" class="v-th-tall">अनुक्रमांक</th>
+                    <th rowspan="2" class="v-th-tall">दाखिला क्र.</th>
+                    <th rowspan="2" style="border:1px solid #000; min-width:140px;">विद्यार्थी का नाम</th>
+                    <th rowspan="2" style="border:1px solid #000; min-width:110px;">माता का नाम</th>
+                    <th rowspan="2" style="border:1px solid #000; min-width:110px;">पिता का नाम</th>
+                    <th rowspan="2" style="border:1px solid #000; min-width:85px;">जन्मतिथि</th>
+                    <th rowspan="2" class="v-th-tall">लिंग</th>
+                    <th rowspan="2" class="v-th-tall">वर्ग</th>
+                    <th rowspan="2" class="v-th-tall">समग्र आईडी</th>
+                    <th rowspan="2" style="border:1px solid #000; min-width:85px;">आधार नंबर</th>
                     {a3_component_headers}
-                    <th rowspan="2" class="v-th-tall">Total Obtained</th>
-                    <th rowspan="2" class="v-th-tall">Result</th>
-                    <th rowspan="2" class="v-th-tall">Percentage</th>
-                    <th rowspan="2" class="v-th-tall">Grade</th>
-                    <th rowspan="2" class="v-th-tall">Rank</th>
-                    <th rowspan="2" class="v-th-tall">Attendance</th>
+                    <th rowspan="2" class="v-th-tall">कुल प्राप्तांक</th>
+                    <th rowspan="2" class="v-th-tall">परीक्षा परिणाम</th>
+                    <th rowspan="2" class="v-th-tall">प्रतिशत (%)</th>
+                    <th rowspan="2" class="v-th-tall">{grade_col_label}</th>
+                    <th rowspan="2" class="v-th-tall">रैंक</th>
+                    <th rowspan="2" class="v-th-tall">उपस्थिति</th>
                 </tr>
                 <tr>
-                    {sub_ths_hy}{sub_ths_pr}{sub_ths_yr}{sub_ths_fn}
+                    {sub_ths_all}
                 </tr>
             </thead>
             <tbody>
                 {student_rows_a3}
             </tbody>
         </table>
+        <div style="display:flex; justify-content:space-between; margin-top:35px; font-size:12px; font-weight:bold; padding:0 20px;">
+            <div>____________________________<br>कक्षा अध्यापक के हस्ताक्षर</div>
+            <div>____________________________<br>परीक्षा प्रभारी हस्ताक्षर</div>
+            <div>____________________________<br>संस्था प्रधान (मुद्रा सहित)</div>
+        </div>
     </div>
     """
     render_html(a3_html)
 
-    st.divider()
-    st.subheader("📥 A3 वार्षिक परीक्षाफल पत्रक डाउनलोड केंद्र (केवल Principal हेतु)")
-    
-    cur_role_a3 = st.session_state.get("authenticated_role", "PRINCIPAL")
-    if cur_role_a3 == "TEACHER":
-        render_html('''
-        <div style="background: #FEF2F2; border-left: 4px solid #EF4444; padding: 12px 16px; border-radius: 6px; color: #991B1B; font-size: 12.5px;">
-            <b>🔒 शासकीय डेटा सुरक्षा सूचना:</b> A3 संपूर्ण कक्षा परीक्षाफल पत्रक डाउनलोड करने का अधिकार केवल <b>संस्था प्रधान (Principal)</b> खाते में अधिकृत है।
-        </div>
-        ''')
-    else:
-        if render_export_gatekeeper(f"A3 परीक्षाफल पत्रक ({selected_class})"):
-            c_a3_dw1, c_a3_dw2 = st.columns(2)
-            m44_export = generate_master_44col_df(students_df, cls_data["evaluations"], cls_subjects, s_info, selected_class)
-            with c_a3_dw1:
-                x_bytes, x_mime, _ = export_dataframe_bytes(m44_export, "Excel (.xlsx)")
-                st.download_button("📥 A3 परिणाम शीट डाउनलोड (Excel .xlsx)", data=x_bytes, file_name=f"A3_Annual_Result_{selected_class}_{s_info.get('session','2026-27')}.xlsx", mime=x_mime, type="primary", use_container_width=True, key=f"btn_dw_a3_xlsx_{selected_class}")
-            with c_a3_dw2:
-                c_bytes, c_mime, _ = export_dataframe_bytes(m44_export, "CSV (.csv)")
-                st.download_button("📥 A3 परिणाम शीट डाउनलोड (CSV .csv)", data=c_bytes, file_name=f"A3_Annual_Result_{selected_class}_{s_info.get('session','2026-27')}.csv", mime=c_mime, use_container_width=True, key=f"btn_dw_a3_csv_{selected_class}")
+    # Master Tabulation Sheet Excel/CSV export
+    m44_export = generate_master_44col_df(students_df, cls_data["evaluations"], cls_subjects, s_info, selected_class)
+    render_govt_portals_hub("A3 वार्षिक परीक्षाफल पत्रक", selected_class, m44_export, f"A3_Annual_Result_{selected_class}")
 
 # ----------------- MODULE 11: SUMMARY -----------------
 elif menu == T["nav_summary"]:
-    st.markdown('<div class="main-header">📊 श्रेणीवार एवं ग्रेडवार परीक्षा परिणाम सारांश</div>', unsafe_allow_html=True)
-    st.info("कक्षा का संपूर्ण श्रेणीवार (SC/ST/OBC/GEN) एवं ग्रेडवार सारांश।")
-    summary_df = generate_master_44col_df(cls_data["students"], cls_data["evaluations"], get_class_subjects(selected_class), st.session_state.school_info, selected_class)
-    st.dataframe(summary_df, use_container_width=True)
+    st.markdown('<div class="main-header">📊 11. श्रेणीवार एवं लिंगवार परीक्षा परिणाम गोश्वारा (RSKMP / MPBSE प्रारूप)</div>', unsafe_allow_html=True)
+    
+    clean_cls = str(selected_class).lower()
+    is_9_10 = any(k in clean_cls for k in ["class 9", "class 10", "9th", "10th", "कक्षा 9", "कक्षा 10"])
+    
+    st.info(f"💡 **शासकीय परिणाम सारांश (Goshwara):** संकुल, बीआरसी (BRC) एवं डीईओ (DEO) कार्यालय में जमा करने हेतु आधिकारिक श्रेणीवार (GEN/OBC/SC/ST) एवं लिंगवार (छात्र/छात्रा) {'डिवीजन' if is_9_10 else 'ग्रेड'} सारांश।")
+    
+    cls_subs = get_class_subjects(selected_class)
+    goshwara_df = generate_official_goshwara_summary_df(cls_data["students"], cls_data["evaluations"], cls_subs, selected_class)
+    
+    st.subheader(f"📋 परीक्षा परिणाम गोश्वारा तालिका — {selected_class}")
+    st.dataframe(goshwara_df, use_container_width=True)
 
     # Govt Portals Hub & Principal Download for Summary
-    render_govt_portals_hub("परीक्षा परिणाम सारांश", selected_class, summary_df, f"Result_Summary_{selected_class}")
+    render_govt_portals_hub("परीक्षा परिणाम गोश्वारा सारांश", selected_class, goshwara_df, f"Goshwara_Summary_{selected_class}")
 
 # ----------------- MODULE 12: MERIT LIST -----------------
 elif menu == T.get("nav_merit", "🏆 12. वार्षिक परीक्षा प्रावीण्य सूची (Merit List)"):
@@ -4056,50 +4441,81 @@ elif menu == T.get("nav_merit", "🏆 12. वार्षिक परीक्�
 
 # ----------------- MODULE 13: SUPPLEMENTARY LIST -----------------
 elif menu == T.get("nav_supple", "📋 13. पूरक परीक्षा छात्र सूची (Supplementary List)"):
-    st.markdown('<div class="main-header">📋 13. पूरक / अनुपूरक परीक्षा छात्र सूची (RSKMP एवं MPBSE नियमानुसार)</div>', unsafe_allow_html=True)
-    cls_subs = get_class_subjects(selected_class)
-    rule_cfg = get_session_exam_rule(st.session_state.school_info.get("session", "2026-27"), selected_class)
-    has_proj = any(c["id"] == "project" for c in rule_cfg["components"])
+    st.markdown('<div class="main-header">📋 13. पूरक / पुनः परीक्षा छात्र सूची (RSKMP एवं MPBSE नियमानुसार)</div>', unsafe_allow_html=True)
     
-    st.info(f"📌 **लागू शासकीय नियम:** {rule_cfg['name']} | **उत्तीर्णांक मानदंड:** वार्षिक लिखित न्यूनतम 20/60 (33.33%), {'प्रोजेक्ट न्यूनतम 7/20 (33.33%)' if has_proj else 'अर्धवार्षिक न्यूनतम 13/40 (33.33%)'} एवं कुल न्यूनतम 33/100")
+    clean_cls = str(selected_class).lower()
+    is_9_10 = any(k in clean_cls for k in ["class 9", "class 10", "9th", "10th", "कक्षा 9", "कक्षा 10"])
+    is_5_8 = any(k in clean_cls for k in ["class 5", "class 8", "5th", "8th", "कक्षा 5", "कक्षा 8"])
+    cls_subs = get_class_subjects(selected_class)
+    s_info = st.session_state.school_info
+    
+    if is_9_10:
+        rule_desc = "MPBSE हाईस्कूल नियम: वार्षिक लिखित में न्यूनतम 25/75 (33.33%) एवं आंतरिक में न्यूनतम 8/25 अंक। 1 या 2 विषय में अनुत्तीर्ण होने पर पूरक (Supplementary) तथा 3 या अधिक में अनुत्तीर्ण होने पर 'रुक जाना नहीं' योजना / पुनः परीक्षा।"
+    elif is_5_8:
+        rule_desc = "RSKMP 5वीं व 8वीं बोर्ड नियम: वार्षिक लिखित में न्यूनतम 20/60 (33.33%), प्रोजेक्ट में न्यूनतम 7/20, अर्धवार्षिक में न्यूनतम 7/20 एवं कुल 33/100। 1 या अधिक विषय में अनुत्तीर्ण छात्रों हेतु राज्य शिक्षा केंद्र द्वारा विशेष पुनः परीक्षा (Retest) आयोजित होती है।"
+    else:
+        rule_desc = "RSKMP स्थानीय परीक्षा नियम: वार्षिक लिखित में न्यूनतम 20/60 एवं अर्धवार्षिक में न्यूनतम 13/40। अनुत्तीर्ण छात्रों हेतु शाला स्तर पर विशेष उपचारात्मक पुनः परीक्षा।"
+
+    st.info(f"📌 **उत्तीर्णांक एवं पूरक परीक्षा नियम:** {rule_desc}")
     
     supple_data = []
     for _, s in cls_data["students"].iterrows():
         r_no = s["Roll_No"]
         ev = cls_data["evaluations"].get(r_no, {})
+        m_dict = ev.get("marks", {})
         failed_subs = []
+        
         for sub in cls_subs:
-            se = ev.get("marks", {}).get(sub["id"], {})
-            h = se.get("half_yearly", 16 if has_proj else 32)
-            p = se.get("project", 16 if has_proj else 0)
-            y = se.get("annual", 48)
-            t = se.get("total", (h + p + y) if has_proj else (h + y))
-            
+            se = m_dict.get(sub["id"], {})
             reasons = []
-            if has_proj:
-                if y < 20: reasons.append(f"वार्षिक लिखित {y}/60 (< 20)")
+            if is_9_10:
+                w_q = se.get("quarterly_5%", 4)
+                w_hy = se.get("half_yearly_5%", 4)
+                proj = se.get("project", 15)
+                ia = se.get("internal_assessment", w_q + w_hy + proj)
+                yr = se.get("annual", 55)
+                t = se.get("total", ia + yr)
+                if yr < 25: reasons.append(f"लिखित {yr}/75 (< 25)")
+                if ia < 8: reasons.append(f"आंतरिक {ia}/25 (< 8)")
+                if t < 33: reasons.append(f"कुल {t}/100 (< 33)")
+            elif is_5_8:
+                h = se.get("half_yearly", 16)
+                p = se.get("project", 16)
+                y = se.get("annual", 48)
+                t = se.get("total", h + p + y)
+                if y < 20: reasons.append(f"लिखित {y}/60 (< 20)")
                 if p < 7: reasons.append(f"प्रोजेक्ट {p}/20 (< 7)")
-                if h < 7: reasons.append(f"अर्धवार्षिक {h}/20 (< 7)")
-                if t < 33: reasons.append(f"कुल प्राप्तांक {t}/100 (< 33)")
+                if h < 7: reasons.append(f"छमाही {h}/20 (< 7)")
+                if t < 33: reasons.append(f"कुल {t}/100 (< 33)")
             else:
-                if y < 20: reasons.append(f"वार्षिक परीक्षा {y}/60 (< 20)")
-                if h < 13: reasons.append(f"अर्धवार्षिक {h}/40 (< 13)")
-                if t < 33: reasons.append(f"कुल प्राप्तांक {t}/100 (< 33)")
+                h = se.get("half_yearly", 32)
+                y = se.get("annual", 48)
+                t = se.get("total", h + y)
+                if y < 20: reasons.append(f"वार्षिक {y}/60 (< 20)")
+                if h < 13: reasons.append(f"छमाही {h}/40 (< 13)")
+                if t < 33: reasons.append(f"कुल {t}/100 (< 33)")
                 
             if reasons:
                 failed_subs.append(f"{sub['name']} ({', '.join(reasons)})")
         
         if failed_subs:
             fail_count = len(failed_subs)
-            supple_status = "पूरक परीक्षा (Supplementary)" if fail_count <= 2 else "अनुत्तीर्ण (Needs Retest / Fail)"
+            if is_9_10:
+                supple_status = "पूरक परीक्षा (Supplementary)" if fail_count <= 2 else "रुक जाना नहीं योजना / अनुत्तीर्ण"
+            else:
+                supple_status = "RSKMP विशेष पुनः परीक्षा (Retest / Supplementary)"
+                
             supple_data.append({
-                "Roll_No": r_no,
-                "Scholar_No": s.get("Scholar_No", "--"),
-                "Name": s["Name"],
-                "Father_Name": s["Father_Name"],
-                "Failed_Subjects_Count": fail_count,
-                "Failed_Subjects_Details": " | ".join(failed_subs),
-                "Result_Status": supple_status
+                "DISE_CODE": s_info.get("udise", ""),
+                "CLASS": selected_class,
+                "SAMAGRA_ID": s.get("SSSM_ID", "--"),
+                "SCHOLAR_NO": s.get("Scholar_No", "--"),
+                "ROLL_NO": r_no,
+                "STUDENT_NAME": s["Name"],
+                "FATHER_NAME": s["Father_Name"],
+                "FAILED_SUBJECTS_COUNT": fail_count,
+                "FAILED_SUBJECTS_DETAILS": " | ".join(failed_subs),
+                "ELIGIBLE_SCHEME": supple_status
             })
             
     if supple_data:
@@ -4107,7 +4523,7 @@ elif menu == T.get("nav_supple", "📋 13. पूरक परीक्षा �
         st.dataframe(supple_df, use_container_width=True)
         st.warning(f"⚠️ कुल **{len(supple_data)}** विद्यार्थी पूरक/पुनः परीक्षा पात्रता में पाए गए हैं।")
         # Govt Portals Hub & Principal Download for Supplementary List
-        render_govt_portals_hub("पूरक परीक्षा छात्र सूची", selected_class, supple_df, f"Supplementary_List_{selected_class}")
+        render_govt_portals_hub("पूरक व पुनः परीक्षा छात्र सूची", selected_class, supple_df, f"Supplementary_List_{selected_class}")
     else:
         st.success("🎉 बधाई! कोई भी छात्र पूरक परीक्षा हेतु नहीं है (समस्त छात्र शासकीय न्यूनतम अर्हता अनुसार उत्तीर्ण)!")
 
