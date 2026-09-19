@@ -1,3 +1,20 @@
+def format_clean_dob(val):
+    """Cleans timestamp 00:00:00 and standardizes date to DD/MM/YYYY format"""
+    if not val or pd.isna(val): return ""
+    val_str = str(val).strip()
+    if val_str.lower() in ["nan", "none", "nat", ""]: return ""
+    val_str = re.sub(r"[\sT]+\d{2}:\d{2}(?::\d{2})?.*", "", val_str).strip()
+    m_iso = re.match(r"^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$", val_str)
+    if m_iso:
+        y, m, d = m_iso.groups()
+        return f"{int(d):02d}/{int(m):02d}/{y}"
+    m_dmy = re.match(r"^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$", val_str)
+    if m_dmy:
+        d, m, y = m_dmy.groups()
+        return f"{int(d):02d}/{int(m):02d}/{y}"
+    return val_str
+
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -931,7 +948,7 @@ def match_excel_sheet_to_class(sheet_name, raw_df, existing_classes):
     return None
 
 def parse_sheet_students_robust(raw_df, target_class):
-    """Extracts all valid student records while skipping metadata, title, sub-headers and numbering rows"""
+    """Extracts all valid student records, PEN, APAAR ID, Clean DOB & Attendance (Attended/Total days)"""
     if raw_df.empty or len(raw_df) < 3:
         return pd.DataFrame()
         
@@ -947,43 +964,53 @@ def parse_sheet_students_robust(raw_df, target_class):
     if h_idx == -1:
         return pd.DataFrame()
         
-    headers = [str(x).replace('\n', ' ').strip() for x in raw_df.iloc[h_idx]]
-    
+    # Multi-row combined header check across rows h_idx to h_idx + 4
     col_map = {}
-    for idx, col in enumerate(headers):
-        cl = col.lower()
-        if any(k in cl for k in ["father's name", "father name", "पिता का नाम", "pita"]):
-            col_map["Father_Name"] = idx
-        elif any(k in cl for k in ["mother's name", "mother name", "माता का नाम", "mata"]):
-            col_map["Mother_Name"] = idx
-        elif any(k in cl for k in ["student's name", "name of student", "student name", "विद्यार्थी का नाम", "छात्र का नाम"]) or (cl == "name" and not any(ex in cl for ex in ["father", "mother", "school", "vidyalaya"])):
-            col_map["Name"] = idx
-        elif any(k in cl for k in ["roll no", "roll  no.", "roll", "अनुक्रमांक"]):
-            col_map["Roll_No"] = idx
-        elif any(k in cl for k in ["scholar number", "scholar no", "scholar", "दाखिला"]):
-            col_map["Scholar_No"] = idx
-        elif any(k in cl for k in ["date of birth", "dob", "जन्मतिथि", "birth"]):
-            col_map["DOB"] = idx
-        elif any(k in cl for k in ["gender", "लिंग", "sex"]):
-            col_map["Gender"] = idx
-        elif any(k in cl for k in ["category", "जाति", "वर्ग"]):
-            col_map["Category"] = idx
-        elif any(k in cl for k in ["samagra id", "samagra", "समग्र"]):
-            col_map["SSSM_ID"] = idx
-        elif any(k in cl for k in ["aadhaar no", "aadhar no", "aadhar", "आधार"]):
-            col_map["Aadhar_No"] = idx
-        elif any(k in cl for k in ["pen", "pan", "pan_no", "pen_no", "pan no", "pen no", "permanent education"]):
-            col_map["PAN_No"] = idx
-        elif any(k in cl for k in ["apaar", "apar", "apaar id", "apaar_id", "apar id", "apaar no"]):
-            col_map["APAAR_ID"] = idx
-        elif any(k in cl for k in ["attendance/school", "attendance", "उपस्थिति"]):
-            col_map["Attendance"] = idx
+    for c in range(raw_df.shape[1]):
+        col_texts = []
+        for r in range(h_idx, min(h_idx + 4, len(raw_df))):
+            v = raw_df.iloc[r, c]
+            if pd.notna(v) and str(v).strip().lower() not in ["nan", "none", ""]:
+                col_texts.append(str(v).strip())
+        comb = " ".join(col_texts).lower()
 
-    if "Name" not in col_map:
-        for idx, col in enumerate(headers):
-            cl = col.lower()
-            if "name" in cl and not any(k in cl for k in ["father", "mother", "school"]):
-                col_map["Name"] = idx
+        if "Father_Name" not in col_map and any(k in comb for k in ["father's name", "father name", "पिता का नाम", "pita"]):
+            col_map["Father_Name"] = c
+        elif "Mother_Name" not in col_map and any(k in comb for k in ["mother's name", "mother name", "माता का नाम", "mata"]):
+            col_map["Mother_Name"] = c
+        elif "Name" not in col_map and (any(k in comb for k in ["student's name", "name of student", "student name", "विद्यार्थी का नाम", "छात्र का नाम"]) or (comb == "name" and not any(ex in comb for ex in ["father", "mother", "school"]))):
+            col_map["Name"] = c
+        elif "Roll_No" not in col_map and any(k in comb for k in ["roll no", "roll  no.", "roll", "अनुक्रमांक"]):
+            col_map["Roll_No"] = c
+        elif "Scholar_No" not in col_map and any(k in comb for k in ["scholar number", "scholar no", "scholar", "दाखिला"]):
+            col_map["Scholar_No"] = c
+        elif "DOB" not in col_map and any(k in comb for k in ["date of birth", "dob", "जन्मतिथि", "birth", "ate of birt"]):
+            col_map["DOB"] = c
+        elif "Gender" not in col_map and any(k in comb for k in ["gender", "लिंग", "sex"]):
+            col_map["Gender"] = c
+        elif "Category" not in col_map and any(k in comb for k in ["category", "जाति", "वर्ग"]):
+            col_map["Category"] = c
+        elif "SSSM_ID" not in col_map and any(k in comb for k in ["samagra id", "samagra", "समग्र"]):
+            col_map["SSSM_ID"] = c
+        elif "Aadhar_No" not in col_map and any(k in comb for k in ["aadhaar no", "aadhar no", "aadhar", "आधार"]):
+            col_map["Aadhar_No"] = c
+        elif "PAN_No" not in col_map and any(k in comb for k in ["pen", "pan", "pan_no", "pen_no", "pan no", "pen no", "permanent education"]):
+            col_map["PAN_No"] = c
+        elif "APAAR_ID" not in col_map and any(k in comb for k in ["apaar", "apar", "apaar id", "apaar_id", "apar id", "apaar no", "edulocker"]):
+            col_map["APAAR_ID"] = c
+        elif "Attendance" not in col_map and any(k in comb for k in ["attendance", "working days", "उपस्थिति", "कार्य दिवस", "हाजिरी", "attend", "working_days"]):
+            col_map["Attendance"] = c
+
+    # Fallback pattern scan for Attendance if not found in header
+    if "Attendance" not in col_map:
+        for c in range(raw_df.shape[1]):
+            matches = 0
+            for r in range(h_idx + 1, min(h_idx + 25, len(raw_df))):
+                val_str = str(raw_df.iloc[r, c]).strip()
+                if re.match(r"^\d{1,3}\s*/\s*\d{1,3}$", val_str):
+                    matches += 1
+            if matches >= 2:
+                col_map["Attendance"] = c
                 break
 
     if "Name" not in col_map:
@@ -991,6 +1018,21 @@ def parse_sheet_students_robust(raw_df, target_class):
 
     student_rows = []
     
+    # Check default school medium
+    sch_med = "Hindi (हिन्दी)"
+    try:
+        sch_med = st.session_state.school_info.get("medium", "Hindi (हिन्दी)")
+    except Exception:
+        pass
+    if any(k in str(sch_med).lower() for k in ["english", "अंग्रेजी"]):
+        default_st_medium = "English"
+    elif any(k in str(sch_med).lower() for k in ["marathi", "मराठी"]):
+        default_st_medium = "Marathi (मराठी)"
+    elif any(k in str(sch_med).lower() for k in ["urdu", "उर्दू"]):
+        default_st_medium = "Urdu (اردو)"
+    else:
+        default_st_medium = "Hindi (हिन्दी)"
+
     for r in range(h_idx + 1, len(raw_df)):
         row = raw_df.iloc[r]
         raw_name = str(row[col_map["Name"]]).strip()
@@ -1019,7 +1061,7 @@ def parse_sheet_students_robust(raw_df, target_class):
         scholar_val = clean_val("Scholar_No", "")
         father_val = clean_val("Father_Name", "")
         mother_val = clean_val("Mother_Name", "")
-        dob_val = clean_val("DOB", "")
+        dob_val = format_clean_dob(clean_val("DOB", ""))
         gender_val = clean_val("Gender", "Boy")
         if str(gender_val).lower() in ["boy", "male", "m", "b", "छात्र"]: gender_val = "Boy"
         elif str(gender_val).lower() in ["girl", "female", "f", "g", "छात्रा"]: gender_val = "Girl"
@@ -1035,7 +1077,14 @@ def parse_sheet_students_robust(raw_df, target_class):
         pen_val = clean_val("PAN_No", "")
         apaar_val = clean_val("APAAR_ID", "")
         
-        att_raw = clean_val("Attendance", "200/220")
+        att_raw = clean_val("Attendance", "")
+        if not att_raw or "/" not in str(att_raw):
+            for cell in row:
+                c_str = str(cell).strip()
+                if re.match(r"^\d{1,3}\s*/\s*\d{1,3}$", c_str):
+                    att_raw = c_str
+                    break
+
         att_days, tot_days = 200, 220
         if "/" in str(att_raw):
             pts = str(att_raw).split("/")
@@ -1059,7 +1108,7 @@ def parse_sheet_students_robust(raw_df, target_class):
             "Aadhar_No": aadhar_val,
             "PAN_No": pen_val,
             "APAAR_ID": apaar_val,
-            "Medium": "English" if any(k in target_class.lower() for k in ["nursery", "lkg", "ukg", "1st", "2nd"]) else "Hindi",
+            "Medium": default_st_medium,
             "Status": "Present",
             "Attended_Days": att_days,
             "Total_Days": tot_days
@@ -1067,7 +1116,6 @@ def parse_sheet_students_robust(raw_df, target_class):
         student_rows.append(st_entry)
 
     return pd.DataFrame(student_rows)
-
 def render_govt_portals_hub(tab_title, target_class, export_df=None, default_file_name="Portal_Upload"):
     cur_role = st.session_state.get("authenticated_role", "PRINCIPAL")
     is_teacher = (cur_role == "TEACHER")
@@ -1982,6 +2030,30 @@ def reorder_student_columns(df):
             mask = (df["PAN_No"].isna() | (df["PAN_No"].astype(str).str.strip().isin(["", "nan", "None"])))
             df.loc[mask, "PAN_No"] = df.loc[mask, c].fillna("").astype(str)
             df.drop(columns=[c], inplace=True)
+
+    # Clean DOB of timestamp 00:00:00
+    if "DOB" in df.columns:
+        df["DOB"] = df["DOB"].apply(format_clean_dob)
+
+    # Normalize Medium to match ALL_MEDIUMS options so selectbox column is never blank
+    def fix_medium_val(m):
+        m_str = str(m).strip()
+        if not m_str or m_str.lower() in ["nan", "none", "", "hindi"]:
+            return "Hindi (हिन्दी)"
+        for opt in ALL_MEDIUMS:
+            if opt.lower().startswith(m_str.lower()) or m_str.lower() in opt.lower():
+                return opt
+        try:
+            sch_m = st.session_state.school_info.get("medium", "Hindi (हिन्दी)")
+            if sch_m in ALL_MEDIUMS: return sch_m
+        except Exception:
+            pass
+        return "Hindi (हिन्दी)"
+
+    if "Medium" in df.columns:
+        df["Medium"] = df["Medium"].apply(fix_medium_val)
+    else:
+        df["Medium"] = "Hindi (हिन्दी)"
 
     target_order = [
         "Roll_No", "Scholar_No", "Name", "Father_Name", "Mother_Name", "DOB",
@@ -3111,8 +3183,14 @@ if menu == T["nav_school"]:
                 "class_level": s_cls, "address": s_addr, "block": s_block, "district": s_dist,
                 "contact": s_contact, "email": s_email
             })
+            # Sync Medium across all classes and existing students
+            for c_name, c_dict in st.session_state.data_store.items():
+                st_df = c_dict.get("students", pd.DataFrame())
+                if isinstance(st_df, pd.DataFrame) and not st_df.empty and "Medium" in st_df.columns:
+                    st_df["Medium"] = s_med
             save_data_to_disk()
-            st.success("✅ स्कूल की सभी 10 जानकारियां सुरक्षित कर ली गईं!")
+            st.success(f"✅ स्कूल की सभी जानकारियां एवं समस्त कक्षाओं का माध्यम '{s_med}' सुरक्षित कर दिया गया!")
+            st.rerun()
 
     with col2:
         st.subheader("🖼️ स्कूल लोगो (School Logo)")
