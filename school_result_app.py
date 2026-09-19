@@ -584,52 +584,69 @@ def render_govt_portals_hub(tab_title, target_class, export_df=None, default_fil
     clean_cls = str(target_class).lower()
     is_9_10 = ("class 9" in clean_cls or "class 10" in clean_cls or "9th" in clean_cls or "10th" in clean_cls)
 
-    st.markdown("""
-    <div style="background: linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%); border: 1px solid #BFDBFE; border-radius: 8px; padding: 12px 16px; margin: 14px 0 10px 0;">
+    st.markdown(f"""
+    <div style="background: linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%); border: 1.5px solid #BFDBFE; border-radius: 8px; padding: 12px 16px; margin: 16px 0 10px 0;">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
             <div>
-                <b style="color: #1E3A8A; font-size: 14.5px;">🌐 शासकीय पोर्टल डायरेक्ट अपलोड एवं सिंक हब (Govt Portals Direct Hub)</b><br>
-                <span style="font-size: 11.5px; color: #475569;">RSKMP (1ली से 8वीं), MPBSE (9वीं-10वीं), समग्र शिक्षा पोर्टल एवं विमर्श पोर्टल से सीधा जुड़ाव</span>
+                <b style="color: #1E3A8A; font-size: 15px;">🌐 शासकीय पोर्टल डायरेक्ट अपलोड, कॉपी-पेस्ट एवं डाउनलोड केंद्र ({tab_title})</b><br>
+                <span style="font-size: 12px; color: #475569;">RSKMP (कक्षा 1ली से 8वीं), MPBSE (कक्षा 9वीं-10वीं) एवं समग्र शिक्षा पोर्टल हेतु त्वरित डेटा एक्सेस डेस्क</span>
             </div>
-            <div style="font-size: 11px; background: #DCFCE7; color: #166534; font-weight: bold; padding: 4px 10px; border-radius: 20px; border: 1px solid #86EFAC;">
-                🟢 डायरेक्ट पोर्टल सिंक डेस्क सक्रिय (बिना OTP के उपयोग हेतु अधिकृत)
+            <div style="font-size: 11.5px; background: #DCFCE7; color: #166534; font-weight: bold; padding: 4px 12px; border-radius: 20px; border: 1px solid #86EFAC;">
+                🟢 पोर्टल एक्सेस व डेटा ट्रांसफर डेस्क सक्रिय
             </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
+    # 4 Direct Portal Access Links
     c_p1, c_p2, c_p3, c_p4 = st.columns(4)
     with c_p1:
-        st.markdown('<a href="https://www.rskmp.in" target="_blank" style="text-decoration: none;"><div style="background: #1E3A8A; color: white; padding: 8px 10px; border-radius: 6px; text-align: center; font-size: 12px; font-weight: bold;">🏛️ RSKMP पोर्टल (rskmp.in)</div></a>', unsafe_allow_html=True)
+        st.markdown('<a href="https://www.rskmp.in" target="_blank" style="text-decoration: none;"><div style="background: #1E3A8A; color: white; padding: 9px 10px; border-radius: 6px; text-align: center; font-size: 12.5px; font-weight: bold;">🏛️ RSKMP पोर्टल (rskmp.in) ↗</div></a>', unsafe_allow_html=True)
     with c_p2:
-        st.markdown('<a href="https://mpbse.mponline.gov.in" target="_blank" style="text-decoration: none;"><div style="background: #D97706; color: white; padding: 8px 10px; border-radius: 6px; text-align: center; font-size: 12px; font-weight: bold;">🏢 MPBSE पोर्टल (MP Online)</div></a>', unsafe_allow_html=True)
+        st.markdown('<a href="https://mpbse.mponline.gov.in" target="_blank" style="text-decoration: none;"><div style="background: #D97706; color: white; padding: 9px 10px; border-radius: 6px; text-align: center; font-size: 12.5px; font-weight: bold;">🏢 MPBSE पोर्टल (MP Online) ↗</div></a>', unsafe_allow_html=True)
     with c_p3:
-        st.markdown('<a href="https://shikshaportal.mp.gov.in" target="_blank" style="text-decoration: none;"><div style="background: #0D9488; color: white; padding: 8px 10px; border-radius: 6px; text-align: center; font-size: 12px; font-weight: bold;">📚 समग्र शिक्षा पोर्टल (MP)</div></a>', unsafe_allow_html=True)
+        st.markdown('<a href="https://shikshaportal.mp.gov.in" target="_blank" style="text-decoration: none;"><div style="background: #0D9488; color: white; padding: 9px 10px; border-radius: 6px; text-align: center; font-size: 12.5px; font-weight: bold;">📚 समग्र शिक्षा पोर्टल ↗</div></a>', unsafe_allow_html=True)
     with c_p4:
-        st.markdown('<a href="https://www.vimarsh.mp.gov.in" target="_blank" style="text-decoration: none;"><div style="background: #4F46E5; color: white; padding: 8px 10px; border-radius: 6px; text-align: center; font-size: 12px; font-weight: bold;">🎯 विमर्श पोर्टल (DPI MP)</div></a>', unsafe_allow_html=True)
+        st.markdown('<a href="https://www.vimarsh.mp.gov.in" target="_blank" style="text-decoration: none;"><div style="background: #4F46E5; color: white; padding: 9px 10px; border-radius: 6px; text-align: center; font-size: 12.5px; font-weight: bold;">🎯 विमर्श पोर्टल (DPI MP) ↗</div></a>', unsafe_allow_html=True)
 
-    c_hub_left, c_hub_right = st.columns([1.5, 1.5])
+    c_hub_left, c_hub_right = st.columns([1.4, 1.6])
+    
+    # LEFT: FAST PORTAL UPLOAD & COPY-PASTE PAYLOAD
     with c_hub_left:
-        with st.expander("🚀 डायरेक्ट पोर्टल पर डेटा अपलोड / प्रेषण (बिना OTP के)", expanded=True):
+        with st.expander("🚀 डायरेक्ट पोर्टल पर डेटा अपलोड / 1-क्लिक कॉपी-पेस्ट पेलोड", expanded=True):
             st.markdown(f"**कक्षा:** `{target_class}` | **माड्यूल:** `{tab_title}`")
             target_portal_url = "https://www.rskmp.in" if not is_9_10 else "https://mpbse.mponline.gov.in"
-            target_portal_name = "RSKMP (rskmp.in)" if not is_9_10 else "MPBSE MP Online"
-            st.markdown(f'<a href="{target_portal_url}" target="_blank" style="text-decoration: none;"><div style="background: #15803D; color: white; padding: 10px 14px; border-radius: 6px; text-align: center; font-weight: bold; font-size: 13px; margin: 6px 0;">🌐 सीधे {target_portal_name} खोलें एवं डेटा प्रेषित करें ↗</div></a>', unsafe_allow_html=True)
-            st.caption("ℹ️ इस विकल्प के लिए OTP की आवश्यकता नहीं है। शिक्षक या संस्था प्रधान सीधे पोर्टल लॉगिन कर डेटा अपलोड कर सकते हैं।")
-            if export_df is not None and not export_df.empty:
-                show_payload = st.checkbox("📋 1-क्लिक डेटा पेलोड देखें / कॉपी करें (Portal Fast Upload)", value=False, key=f"chk_payload_{tab_title}_{target_class}")
-                if show_payload:
-                    csv_preview = export_df.to_csv(index=False)
-                    st.text_area("पोर्टल हेतु तैयार डेटा (CSV / Copy-Paste Text):", value=csv_preview, height=120, key=f"ta_payload_{tab_title}_{target_class}")
+            target_portal_name = "राज्य शिक्षा केंद्र (RSKMP)" if not is_9_10 else "माध्यमिक शिक्षा मण्डल (MPBSE)"
+            
+            st.markdown(f'<a href="{target_portal_url}" target="_blank" style="text-decoration: none;"><div style="background: #15803D; color: white; padding: 10px 14px; border-radius: 6px; text-align: center; font-weight: bold; font-size: 13.5px; margin: 8px 0;">🌐 सीधे {target_portal_name} खोलें एवं लॉगिन करें ↗</div></a>', unsafe_allow_html=True)
+            st.caption("💡 **कॉपी-पेस्ट निर्देश:** ऊपर दिए गए बटन से पोर्टल खोलें। नीचे दिए गए डेटा बॉक्स में पूरा डेटा उपलब्ध है। इसे कॉपी करके सीधे पोर्टल के ऑनलाइन एक्सेल/टेम्पलेट में पेस्ट करें:")
 
-    with c_hub_right:
-        with st.expander("📥 कंप्यूटर में बल्क अपलोड फ़ाइल डाउनलोड (केवल Principal हेतु - OTP सुरक्षित)", expanded=True):
-            if is_teacher:
-                st.markdown('<div style="background: #FEF2F2; border-left: 4px solid #EF4444; padding: 10px 14px; border-radius: 6px; color: #991B1B; font-size: 12px; margin: 6px 0;"><b>🔒 शासकीय डेटा सुरक्षा सूचना:</b> फ़ाइल डाउनलोड केवल <b>संस्था प्रधान (Principal)</b> खाते में अधिकृत है।</div>', unsafe_allow_html=True)
+            if export_df is not None and not export_df.empty:
+                csv_payload = export_df.to_csv(index=False)
+                st.markdown("**📋 पोर्टल हेतु तैयार पूरा डेटा (Copy-Paste Text):**")
+                st.text_area(f"पूरा डेटा ({len(export_df)} रिकॉर्ड्स) - Ctrl+A दबाकर Copy (Ctrl+C) करें:", value=csv_payload, height=135, key=f"ta_payload_{tab_title}_{target_class}")
+                st.info("📌 **त्वरित उपयोग:** बॉक्स में क्लिक करें -> `Ctrl + A` दबाएं -> `Ctrl + C` से कॉपी करें और पोर्टल में पेस्ट कर दें!")
             else:
-                st.markdown("<span style='font-size: 12px; color: #334155;'>पोर्टल पर ऑफलाइन बल्क अपलोड हेतु Excel/CSV फ़ाइल अपने कंप्यूटर में डाउनलोड करें:</span>", unsafe_allow_html=True)
+                st.caption("⚠️ इस कक्षा/मॉड्यूल में अभी कोई डेटा उपलब्ध नहीं है।")
+
+    # RIGHT: PRINCIPAL-ONLY DOWNLOAD WITH DPDP WARNING & OTP GATEKEEPER
+    with c_hub_right:
+        with st.expander("📥 कंप्यूटर में बल्क डेटा फ़ाइल डाउनलोड (केवल Principal हेतु - OTP सुरक्षित)", expanded=True):
+            st.markdown('''
+            <div style="background: #FFFBEB; border-left: 4px solid #F59E0B; padding: 8px 12px; border-radius: 5px; margin-bottom: 8px; font-size: 11.5px; color: #92400E; line-height: 1.4;">
+                <b>⚠️ DPDP Act 2023 / छात्र डेटा सुरक्षा नियम:</b> बल्क छात्र डेटा डाउनलोड करने का वैधानिक अधिकार केवल <b>संस्था प्रधान (Principal)</b> के अधिकृत खाते में OTP सत्यापन के पश्चात ही उपलब्ध है।
+            </div>
+            ''', unsafe_allow_html=True)
+
+            if is_teacher:
+                st.markdown('''
+                <div style="background: #FEF2F2; border-left: 4px solid #EF4444; padding: 10px 14px; border-radius: 6px; color: #991B1B; font-size: 12px; margin: 6px 0;">
+                    <b>🔒 शासकीय डेटा सुरक्षा सूचना:</b> फ़ाइल डाउनलोड केवल <b>संस्था प्रधान (Principal)</b> खाते में अधिकृत है। शिक्षक खाते के लिए डाउनलोड प्रतिबंधित है।
+                </div>
+                ''', unsafe_allow_html=True)
+            else:
                 if export_df is not None and not export_df.empty:
-                    if render_export_gatekeeper(f"{tab_title} फ़ाइल डाउनलोड"):
+                    if render_export_gatekeeper(f"{tab_title} ({target_class})"):
                         c_dw1, c_dw2 = st.columns(2)
                         with c_dw1:
                             x_bytes, x_mime, x_ext = export_dataframe_bytes(export_df, "Excel (.xlsx)")
@@ -3124,6 +3141,10 @@ elif menu == T["nav_student"]:
                 except Exception as e:
                     st.error(f"❌ एक्सेल फ़ाइल आयात करने में त्रुटि: {e}")
 
+    # Govt Portals Hub & Principal Download for Student Master
+    if not students_df.empty:
+        render_govt_portals_hub("विद्यार्थी मास्टर", selected_class, students_df, f"Student_Master_{selected_class}")
+
 # ----------------- MODULE 3: DUAL ATTENDANCE REGISTER -----------------
 elif menu == T["nav_attendance"]:
     st.markdown('<div class="main-header">📅 विद्यार्थी उपस्थिति प्रबंधन (Student Attendance Portal)</div>', unsafe_allow_html=True)
@@ -3232,6 +3253,10 @@ elif menu == T["nav_attendance"]:
                     cls_data["students"].loc[cls_data["students"]["Roll_No"] == r["Roll_No"], "Total_Days"] = int(tot_work_days)
                 save_data_to_disk()
                 st.success("✅ माहवार उपस्थिति सुरक्षित!")
+
+        # Govt Portals Hub & Principal Download for Attendance
+        if not att_df.empty:
+            render_govt_portals_hub("माहवार उपस्थिति पत्रक", selected_class, att_df, f"Attendance_Register_{selected_class}")
 
 # ----------------- MODULE 4: EVALUATION ENTRY (SUBJECT-WISE PRESENT/ABSENT) -----------------
 elif menu == T["nav_eval"]:
@@ -3349,6 +3374,24 @@ elif menu == T["nav_eval"]:
             save_data_to_disk()
             st.success(f"✅ रोल नंबर {sel_roll} का मूल्यांकन सुरक्षित व सिंक कर दिया गया!")
             st.rerun()
+
+        # Govt Portals Hub & Principal Download for Evaluation
+        eval_summary_rows = []
+        for _, st_row in students_df.iterrows():
+            r_no = st_row["Roll_No"]
+            ev_data = cls_data["evaluations"].get(r_no, {})
+            row_dict = {"Roll_No": r_no, "Name": st_row["Name"], "Status": ev_data.get("status", "Present")}
+            for sub in cls_subjects:
+                s_info_m = ev_data.get("marks", {}).get(sub["id"], {})
+                row_dict[f"{sub['name']}_अर्धवार्षिक"] = s_info_m.get("half_yearly", 0)
+                row_dict[f"{sub['name']}_प्रोजेक्ट"] = s_info_m.get("project", 0)
+                row_dict[f"{sub['name']}_वार्षिक"] = s_info_m.get("annual", 0)
+                row_dict[f"{sub['name']}_कुल"] = s_info_m.get("total", 0)
+                row_dict[f"{sub['name']}_ग्रेड"] = s_info_m.get("grade", "Ab")
+            eval_summary_rows.append(row_dict)
+        if eval_summary_rows:
+            eval_summary_df = pd.DataFrame(eval_summary_rows)
+            render_govt_portals_hub("परीक्षा एवं गतिविधि मूल्यांकन", selected_class, eval_summary_df, f"Evaluation_Summary_{selected_class}")
 
 # ----------------- MODULE 5: STUDENT COMPLETE DATA DOSSIER & VIEWER -----------------
 elif menu == T["nav_viewer"]:
@@ -3520,6 +3563,11 @@ elif menu == T.get("nav_monthly_test", "📝 6. मासिक मूल्य�
             st.success("✅ मासिक अंक सुरक्षित एवं अधिभार अपडेट!")
             st.rerun()
 
+        # Govt Portals Hub & Principal Download for Monthly Tests
+        month_name_map = {m["id"]: m["name"] for m in available_months}
+        cur_m_name = month_name_map.get(selected_month_id, str(selected_month_id))
+        render_govt_portals_hub(f"मासिक टेस्ट ({cur_m_name})", target_mt_class, pd.DataFrame(mt_rows), f"Monthly_Test_{selected_month_id}_{target_mt_class}")
+
 # ----------------- MODULE 7: HALF-YEARLY EXAMINATION -----------------
 elif menu == T.get("nav_half_yearly", "📑 7. अर्धवार्षिक परीक्षा मूल्यांकन (Half-Yearly Exam — 20% अधिभार)"):
     st.markdown('<div class="main-header">📑 अर्धवार्षिक परीक्षा मूल्यांकन पंजी (20% अधिभार)</div>', unsafe_allow_html=True)
@@ -3558,6 +3606,9 @@ elif menu == T.get("nav_half_yearly", "📑 7. अर्धवार्षिक
             st.success("✅ अर्धवार्षिक प्राप्तांक व 20% अधिभार सुरक्षित!")
             st.rerun()
 
+        # Govt Portals Hub & Principal Download for Half-Yearly
+        render_govt_portals_hub("अर्धवार्षिक परीक्षा मूल्यांकन", selected_class, pd.DataFrame(hy_rows), f"Half_Yearly_Exam_{selected_class}")
+
 # ----------------- MODULE 8: ANNUAL PROJECT WORK EVALUATION -----------------
 elif menu == T.get("nav_project", "🎨 8. वार्षिक प्रोजेक्ट कार्य मूल्यांकन (Project Work — 10%/20 अंक)"):
     st.markdown('<div class="main-header">🎨 वार्षिक प्रोजेक्ट कार्य मूल्यांकन पंजी</div>', unsafe_allow_html=True)
@@ -3595,6 +3646,9 @@ elif menu == T.get("nav_project", "🎨 8. वार्षिक प्रोज
             save_data_to_disk()
             st.success("✅ प्रोजेक्ट अंक सुरक्षित एवं अधिभार अपडेट!")
             st.rerun()
+
+        # Govt Portals Hub & Principal Download for Project Work
+        render_govt_portals_hub("वार्षिक प्रोजेक्ट कार्य", selected_class, pd.DataFrame(pj_rows), f"Project_Work_{selected_class}")
 
 # ----------------- MODULE 9: PRINT MARKSHEET (SHASHKIY PRAGATI PATRAK) & PORTAL HUB -----------------
 elif menu == T.get("nav_marksheet", "🖨️ 9. शासकीय वार्षिक प्रगति पत्रक एवं RSKMP/MPBSE पोर्टल केंद्र"):
@@ -3978,6 +4032,9 @@ elif menu == T["nav_summary"]:
     summary_df = generate_master_44col_df(cls_data["students"], cls_data["evaluations"], get_class_subjects(selected_class), st.session_state.school_info, selected_class)
     st.dataframe(summary_df, use_container_width=True)
 
+    # Govt Portals Hub & Principal Download for Summary
+    render_govt_portals_hub("परीक्षा परिणाम सारांश", selected_class, summary_df, f"Result_Summary_{selected_class}")
+
 # ----------------- MODULE 12: MERIT LIST -----------------
 elif menu == T.get("nav_merit", "🏆 12. वार्षिक परीक्षा प्रावीण्य सूची (Merit List)"):
     st.markdown('<div class="main-header">🏆 वार्षिक परीक्षा प्रावीण्य सूची (Merit List)</div>', unsafe_allow_html=True)
@@ -3993,6 +4050,9 @@ elif menu == T.get("nav_merit", "🏆 12. वार्षिक परीक्�
         res_df = pd.DataFrame(records).sort_values(by="Total", ascending=False)
         res_df["Rank"] = range(1, len(res_df) + 1)
         st.dataframe(res_df[["Rank", "Roll_No", "Name", "Father_Name", "Total", "Percentage", "Grade"]], use_container_width=True)
+
+        # Govt Portals Hub & Principal Download for Merit List
+        render_govt_portals_hub("वार्षिक प्रावीण्य सूची (Merit List)", selected_class, res_df, f"Merit_List_{selected_class}")
 
 # ----------------- MODULE 13: SUPPLEMENTARY LIST -----------------
 elif menu == T.get("nav_supple", "📋 13. पूरक परीक्षा छात्र सूची (Supplementary List)"):
@@ -4046,6 +4106,8 @@ elif menu == T.get("nav_supple", "📋 13. पूरक परीक्षा �
         supple_df = pd.DataFrame(supple_data)
         st.dataframe(supple_df, use_container_width=True)
         st.warning(f"⚠️ कुल **{len(supple_data)}** विद्यार्थी पूरक/पुनः परीक्षा पात्रता में पाए गए हैं।")
+        # Govt Portals Hub & Principal Download for Supplementary List
+        render_govt_portals_hub("पूरक परीक्षा छात्र सूची", selected_class, supple_df, f"Supplementary_List_{selected_class}")
     else:
         st.success("🎉 बधाई! कोई भी छात्र पूरक परीक्षा हेतु नहीं है (समस्त छात्र शासकीय न्यूनतम अर्हता अनुसार उत्तीर्ण)!")
 
