@@ -364,10 +364,10 @@ def generate_mpbse_df(students_df, evaluations, cls_subjects, school_info, selec
     return pd.DataFrame(rows)
 
 def generate_master_44col_df(students_df, evaluations, cls_subjects, school_info, selected_class):
-    """Generates the official master tabulation sheet dynamically tailored for:
-    1. MPBSE 9th/10th (25 Internal Assessment + 75 Board Theory = 100)
-    2. RSKMP 5th/8th Board (20 Half-Yearly + 20 Project + 60 Annual Written = 100)
-    3. RSKMP 1-4 & 6-7 Local (40 Half-Yearly + 60 Annual Written = 100)
+    """Generates the official 35/44-column master tabulation sheet with visible Monthly Test Weightage:
+    1. MPBSE 9th/10th: त्रैमासिक/मासिक (5%) + छमाही (5%) + प्रोजेक्ट (15) = 25 आंतरिक + 75 लिखित = 100 अंक
+    2. RSKMP 5th/8th Board: मासिक CCE [10] + छमाही [20] + प्रोजेक्ट [20] + वार्षिक लिखित [60] = 100 अंक
+    3. RSKMP 1-4 & 6-7 Local: मासिक 10% [10] + प्रोजेक्ट 10% [10] + छमाही 20% [20] + वार्षिक लिखित [60] = 100 अंक (35-कॉलम मॉडल)
     """
     clean_cls = str(selected_class).lower().strip()
     is_9_10 = any(k in clean_cls for k in ["class 9", "class 10", "9th", "10th", "कक्षा 9", "कक्षा 10"])
@@ -396,7 +396,7 @@ def generate_master_44col_df(students_df, evaluations, cls_subjects, school_info
         all_pass = True
         
         if is_9_10:
-            # MPBSE Format
+            # MPBSE Format (Internal Assessment 25 [Q 5% + HY 5% + Proj 15] + Board Theory 75 = 100)
             for i, sub in enumerate(cls_subjects, 1):
                 se = m_dict.get(sub["id"], {})
                 w_q = se.get("quarterly_5%", 4)
@@ -408,14 +408,18 @@ def generate_master_44col_df(students_df, evaluations, cls_subjects, school_info
                 tot_m += tot
                 if ia < 8 or yr < 25 or tot < 33:
                     all_pass = False
-                row[f"{sub['name']}_आंतरिक[25]"] = ia
-                row[f"{sub['name']}_लिखित[75]"] = yr
+                row[f"{sub['name']}_त्रैमासिक/मासिक[5]"] = w_q
+                row[f"{sub['name']}_छमाही_अधिभार[5]"] = w_hy
+                row[f"{sub['name']}_प्रोजेक्ट[15]"] = proj
+                row[f"{sub['name']}_कुल_आंतरिक[25]"] = ia
+                row[f"{sub['name']}_बोर्ड_लिखित[75]"] = yr
                 row[f"{sub['name']}_कुल[100]"] = tot
                 row[f"{sub['name']}_ग्रेड"] = se.get("grade", calculate_grade(tot))
         elif is_5_8:
-            # RSKMP 5th & 8th Board Format
+            # RSKMP 5th & 8th Board Format (HY 20 + Proj 20 + Written 60 = 100) with Monthly CCE Tracker
             for i, sub in enumerate(cls_subjects, 1):
                 se = m_dict.get(sub["id"], {})
+                w_m, _, _ = calculate_subject_monthly_weightage(ev, sub["id"], selected_class)
                 hy = se.get("half_yearly", 16)
                 pj = se.get("project", 16)
                 yr = se.get("annual", 48)
@@ -423,23 +427,41 @@ def generate_master_44col_df(students_df, evaluations, cls_subjects, school_info
                 tot_m += tot
                 if hy < 7 or pj < 7 or yr < 20 or tot < 33:
                     all_pass = False
+                row[f"{sub['name']}_मासिक_CCE[10]"] = w_m
                 row[f"{sub['name']}_अर्धवार्षिक[20]"] = hy
                 row[f"{sub['name']}_प्रोजेक्ट[20]"] = pj
-                row[f"{sub['name']}_वार्षिक[60]"] = yr
+                row[f"{sub['name']}_वार्षिक_लिखित[60]"] = yr
                 row[f"{sub['name']}_कुल[100]"] = tot
                 row[f"{sub['name']}_ग्रेड"] = se.get("grade", calculate_grade(tot))
         else:
-            # RSKMP Local Classes (1-4, 6-7)
+            # RSKMP Local Classes 1-4, 6-7: Official 35-Column Weighted Model
+            # 10% Monthly + 10% Project + 20% Half-Yearly + 60% Annual = 100
             for i, sub in enumerate(cls_subjects, 1):
                 se = m_dict.get(sub["id"], {})
-                hy = se.get("half_yearly", 32)
+                w_m, _, _ = calculate_subject_monthly_weightage(ev, sub["id"], selected_class)
+                p_raw = se.get("project", 32)
+                w_p = calculate_subject_project_weightage_rule(p_raw, selected_class)
+                h_raw = se.get("half_yearly", 48)
+                w_h = calculate_subject_half_yearly_weightage(h_raw, "60")
                 yr = se.get("annual", 48)
-                tot = se.get("total", hy + yr)
+                
+                # Check if school is operating on 10+10+20+60 or 40+60
+                if "monthly_tests" in ev and ev["monthly_tests"]:
+                    tot = w_m + w_p + w_h + yr
+                    row[f"{sub['name']}_मासिक_10%[10]"] = w_m
+                    row[f"{sub['name']}_प्रोजेक्ट_10%[10]"] = w_p
+                    row[f"{sub['name']}_छमाही_20%[20]"] = w_h
+                    row[f"{sub['name']}_वार्षिक_लिखित[60]"] = yr
+                else:
+                    # Fallback to standard 40 HY + 60 Annual if monthly test not entered
+                    tot = se.get("total", se.get("half_yearly", 32) + yr)
+                    row[f"{sub['name']}_मासिक_10%[10]"] = w_m
+                    row[f"{sub['name']}_अर्धवार्षिक[40]"] = se.get("half_yearly", 32)
+                    row[f"{sub['name']}_वार्षिक[60]"] = yr
+                    
                 tot_m += tot
-                if hy < 13 or yr < 20 or tot < 33:
+                if yr < 20 or tot < 33:
                     all_pass = False
-                row[f"{sub['name']}_अर्धवार्षिक[40]"] = hy
-                row[f"{sub['name']}_वार्षिक[60]"] = yr
                 row[f"{sub['name']}_कुल[100]"] = tot
                 row[f"{sub['name']}_ग्रेड"] = se.get("grade", calculate_grade(tot))
                 
@@ -3828,7 +3850,7 @@ elif menu == T.get("nav_monthly_test", "📝 6. मासिक मूल्य�
 
     st.markdown('<div class="main-header">📝 मासिक मूल्यांकन रजिस्टर (10 अंक)</div>', unsafe_allow_html=True)
     # FIX: Clean formula representation without raw LaTeX rendering error
-    st.info("💡 **मासिक टेस्ट निर्देश:** प्रत्येक विषय के अधिकतम **10 अंक** हैं। यहाँ भरे गए अंक 4 माह के योग के आधार पर 4 से विभाजित (कुल योग ÷ 4) होकर 35-कॉलम वाली शीट के **Monthly 10% Weightage** में जुड़ते हैं।")
+    st.info("💡 **मासिक टेस्ट शासकीय नियम व समायोजन निर्देश:** प्रत्येक विषय के अधिकतम **10 अंक** हैं। सत्र भर के 4 मासिक टेस्ट (अगस्त, सितम्बर, दिसम्बर, जनवरी) के कुल अंकों को 4 से विभाजित कर **10% अधिभार (10 अंक)** निकाला जाता है। यह अधिभार सीधे **टैब 10 (A3 शीट)** एवं **टैब 14 (35-कॉलम अभिलेख पत्रक)** के **`मासिक 10% [10]`** कॉलम में जुड़कर वार्षिक परीक्षा (100 अंक) में स्वतः एडजस्ट होता है!")
 
     mt_cls_data = get_class_data(target_mt_class)
     students_df = mt_cls_data["students"]
@@ -4271,22 +4293,35 @@ elif menu == T["nav_a3_result"]:
                     all_p = False
                 c_sub_cols += f'<td style="border:1px solid #000; padding:2px; font-weight:bold; color:green;">{t}</td>'
         else:
-            # RSKMP Local: 40 HY + 60 Written = 100
+            # RSKMP Local: 35-Column Weighted Format (Monthly 10 + Project 10 + HY 20 + Annual 60 = 100)
+            for sub in cls_subjects:
+                w_m, _, _ = calculate_subject_monthly_weightage(ev, sub["id"], selected_class)
+                c_sub_cols += f'<td style="border:1px solid #000; padding:2px;">{w_m}</td>'
             for sub in cls_subjects:
                 se = ev.get("marks", {}).get(sub["id"], {})
-                h = se.get("half_yearly", 32)
-                c_sub_cols += f'<td style="border:1px solid #000; padding:2px;">{h}</td>'
+                p_raw = se.get("project", 32)
+                w_p = calculate_subject_project_weightage_rule(p_raw, selected_class)
+                c_sub_cols += f'<td style="border:1px solid #000; padding:2px;">{w_p}</td>'
+            for sub in cls_subjects:
+                se = ev.get("marks", {}).get(sub["id"], {})
+                h_raw = se.get("half_yearly", 48)
+                w_h = calculate_subject_half_yearly_weightage(h_raw, "60")
+                c_sub_cols += f'<td style="border:1px solid #000; padding:2px;">{w_h}</td>'
             for sub in cls_subjects:
                 se = ev.get("marks", {}).get(sub["id"], {})
                 y = se.get("annual", 48)
                 c_sub_cols += f'<td style="border:1px solid #000; padding:2px;">{y}</td>'
             for sub in cls_subjects:
                 se = ev.get("marks", {}).get(sub["id"], {})
-                h = se.get("half_yearly", 32)
+                w_m, _, _ = calculate_subject_monthly_weightage(ev, sub["id"], selected_class)
+                p_raw = se.get("project", 32)
+                w_p = calculate_subject_project_weightage_rule(p_raw, selected_class)
+                h_raw = se.get("half_yearly", 48)
+                w_h = calculate_subject_half_yearly_weightage(h_raw, "60")
                 y = se.get("annual", 48)
-                t = se.get("total", h + y)
+                t = se.get("total", w_m + w_p + w_h + y)
                 tot_obt += t
-                if h < 13 or y < 20 or t < 33:
+                if y < 20 or t < 33:
                     all_p = False
                 c_sub_cols += f'<td style="border:1px solid #000; padding:2px; font-weight:bold; color:green;">{t}</td>'
 
@@ -4344,12 +4379,14 @@ elif menu == T["nav_a3_result"]:
         grade_col_label = "ग्रेड (Grade)"
     else:
         a3_component_headers = f"""
-                    <th colspan="{sub_count}" style="border:1px solid #000;">अर्धवार्षिक / Half Yearly [40]</th>
-                    <th colspan="{sub_count}" style="border:1px solid #000;">वार्षिक परीक्षा / Annual Written [60]</th>
-                    <th colspan="{sub_count}" style="border:1px solid #000; background:#DCFCE7;">अंतिम मूल्यांकन / Final Total [100]</th>
+                    <th colspan="{sub_count}" style="border:1px solid #000; background:#FEF3C7;">मासिक टेस्ट 10% [10]</th>
+                    <th colspan="{sub_count}" style="border:1px solid #000; background:#E0F2FE;">प्रोजेक्ट कार्य 10% [10]</th>
+                    <th colspan="{sub_count}" style="border:1px solid #000; background:#F3E8FF;">अर्धवार्षिक 20% [20]</th>
+                    <th colspan="{sub_count}" style="border:1px solid #000;">वार्षिक लिखित [60]</th>
+                    <th colspan="{sub_count}" style="border:1px solid #000; background:#DCFCE7;">कुल प्राप्तांक [100]</th>
         """
         sub_ths_single = "".join([f'<th class="v-th-tall">{sub["name"]}</th>' for sub in cls_subjects])
-        sub_ths_all = sub_ths_single * 3
+        sub_ths_all = sub_ths_single * 5
         grade_col_label = "ग्रेड (Grade)"
 
     a3_html = f"""
@@ -4530,6 +4567,13 @@ elif menu == T.get("nav_supple", "📋 13. पूरक परीक्षा �
 # ----------------- MODULE 14: WEIGHTED EVALUATION SHEET -----------------
 elif menu == T.get("nav_weighted", "📑 14. वार्षिक परीक्षा परिणाम अभिलेख पत्रक (RSKMP व MPBSE प्रारूप)"):
     st.markdown('<div class="main-header">📑 14. वार्षिक परीक्षा परिणाम अभिलेख पत्रक (35-कॉलम वेटेज शीट)</div>', unsafe_allow_html=True)
+    clean_cls_14 = str(selected_class).lower()
+    if any(k in clean_cls_14 for k in ["class 9", "class 10", "9th", "10th"]):
+        st.info("📌 **MPBSE 10वीं वेटेज नियम:** त्रैमासिक (5%) + छमाही (5%) + प्रोजेक्ट (15) = 25 आंतरिक मूल्यांकन + 75 बोर्ड लिखित = 100 अंक।")
+    elif any(k in clean_cls_14 for k in ["class 5", "class 8", "5th", "8th"]):
+        st.info("📌 **RSKMP 5वीं व 8वीं बोर्ड नियम:** 20 अर्धवार्षिक (20% अधिभार) + 20 वार्षिक प्रोजेक्ट + 60 वार्षिक लिखित = 100 अंक (मासिक CCE सतत मूल्यांकन संधारित)।")
+    else:
+        st.info("📌 **RSKMP स्थानीय कक्षा 35-कॉलम वेटेज समायोजन नियम:** मासिक टेस्ट 10% [10 अंक] + प्रोजेक्ट कार्य 10% [10 अंक] + अर्धवार्षिक परीक्षा 20% [20 अंक] + वार्षिक लिखित [60 अंक] = कुल 100 अंक। (मासिक टेस्ट का 10% अधिभार नीचे तालिका में विषयवार स्पष्ट प्रदर्शित है)।")
     w_df = generate_master_44col_df(cls_data["students"], cls_data["evaluations"], get_class_subjects(selected_class), st.session_state.school_info, selected_class)
     st.dataframe(w_df, use_container_width=True)
 
