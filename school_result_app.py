@@ -917,36 +917,66 @@ def generate_official_goshwara_summary_df(students_df, evaluations, cls_subjects
 # ----------------- UNIVERSAL ROBUST EXCEL WORKBOOK MIGRATOR ENGINE -----------------
 
 def match_excel_sheet_to_class(sheet_name, raw_df, existing_classes):
-    """Matches any Excel sheet name or header text to canonical app class name"""
+    """Matches any Excel sheet name (e.g. KG1, KG2, Nursery, 1st, 7th) or header text to canonical app class name"""
     s = str(sheet_name).lower().strip().replace(" ", "").replace("-", "").replace("_", "")
     for c in existing_classes:
         cl = c.lower().replace(" ", "").replace("-", "").replace("_", "")
         if s == cl or s in cl or cl.replace("class", "") == s:
             return c
             
-    # Fuzzy keyword matching on sheet name
-    if "nur" in s: return "Class Nursery"
-    if "lkg" in s: return "Class LKG"
-    if "ukg" in s or "kg2" in s: return "Class UKG"
+    # Fuzzy keyword matching on sheet tab name
+    if any(k in s for k in ["nur", "nursery", "balvatika", "balwadi"]):
+        for c in existing_classes:
+            if "nur" in c.lower(): return c
+        return "Class Nursery"
+        
+    if any(k in s for k in ["kg1", "kgi", "kg-1", "kg 1", "kg1st", "lkg", "junior", "jrkg", "pp1"]):
+        for c in existing_classes:
+            if "lkg" in c.lower() or "kg1" in c.lower() or "kg-1" in c.lower(): return c
+        return "Class LKG"
+        
+    if any(k in s for k in ["kg2", "kgii", "kg-2", "kg 2", "kg2nd", "ukg", "senior", "srkg", "pp2"]):
+        for c in existing_classes:
+            if "ukg" in c.lower() or "kg2" in c.lower() or "kg-2" in c.lower(): return c
+        return "Class UKG"
+        
     for num, suffix in [("1", "1st"), ("2", "2nd"), ("3", "3rd"), ("4", "4th"), ("5", "5th"), 
-                        ("6", "6th"), ("7", "7th"), ("8", "8th"), ("9", "9th"), ("10", "10th")]:
+                        ("6", "6th"), ("7", "7th"), ("8", "8th"), ("9", "9th"), ("10", "10th"),
+                        ("11", "11th"), ("12", "12th")]:
         if s == suffix or s == num or s == f"class{num}" or s == f"class{suffix}":
+            for c in existing_classes:
+                if suffix in c.lower() or f"class {num}" in c.lower() or f"class {suffix}" in c.lower(): return c
             return f"Class {suffix}"
             
-    # Deep inspect first 5 rows of sheet
+    # Deep inspect first 5 rows of sheet using normalized space matching
     limit_r = min(5, len(raw_df))
     for r in range(limit_r):
         row_str = " ".join([str(x).lower() for x in raw_df.iloc[r].dropna().tolist()])
-        for c in existing_classes:
-            cl = c.lower().replace("class", "").strip()
-            if f"class :, {cl}" in row_str or f"class: {cl}" in row_str or f"class:- {cl}" in row_str or f"class-{cl}" in row_str or f"class - {cl}" in row_str:
-                return c
+        norm_row = re.sub(r"[\s:,\-_/]+", " ", row_str).strip()
+        
+        if any(k in norm_row for k in ["class lkg", "class kg1", "class kg 1", "class kg 1st", "class kgi"]):
+            for c in existing_classes:
+                if "lkg" in c.lower() or "kg1" in c.lower() or "kg-1" in c.lower(): return c
+            return "Class LKG"
+            
+        if any(k in norm_row for k in ["class ukg", "class kg2", "class kg 2", "class kg 2nd", "class kgii"]):
+            for c in existing_classes:
+                if "ukg" in c.lower() or "kg2" in c.lower() or "kg-2" in c.lower(): return c
+            return "Class UKG"
+            
+        if any(k in norm_row for k in ["class nursery", "class nur", "class balvatika"]):
+            for c in existing_classes:
+                if "nur" in c.lower(): return c
+            return "Class Nursery"
+            
         for num, suffix in [("1", "1st"), ("2", "2nd"), ("3", "3rd"), ("4", "4th"), ("5", "5th"), 
-                            ("6", "6th"), ("7", "7th"), ("8", "8th"), ("9", "9th"), ("10", "10th")]:
-            if f"class:- {num}" in row_str or f"class:- {suffix}" in row_str or f"class-{suffix}" in row_str or f"class: {suffix}" in row_str:
+                            ("6", "6th"), ("7", "7th"), ("8", "8th"), ("9", "9th"), ("10", "10th"),
+                            ("11", "11th"), ("12", "12th")]:
+            if f"class {num}" in norm_row or f"class {suffix}" in norm_row:
+                for c in existing_classes:
+                    if suffix in c.lower() or f"class {num}" in c.lower() or f"class {suffix}" in c.lower(): return c
                 return f"Class {suffix}"
     return None
-
 def parse_sheet_students_robust(raw_df, target_class):
     """Extracts all valid student records, PEN, APAAR ID, Clean DOB & Attendance (Attended/Total days)"""
     if raw_df.empty or len(raw_df) < 3:
@@ -1018,20 +1048,43 @@ def parse_sheet_students_robust(raw_df, target_class):
 
     student_rows = []
     
-    # Check default school medium
-    sch_med = "Hindi (हिन्दी)"
-    try:
-        sch_med = st.session_state.school_info.get("medium", "Hindi (हिन्दी)")
-    except Exception:
-        pass
-    if any(k in str(sch_med).lower() for k in ["english", "अंग्रेजी"]):
+    # Check sheet-level medium header first (e.g. Medium : ENGLISH), then fallback to school info
+    sh_med = ""
+    for r in range(min(5, len(raw_df))):
+        row_cells = [str(x) for x in raw_df.iloc[r].dropna().tolist()]
+        for c_idx, cell in enumerate(row_cells):
+            cl = cell.lower()
+            if "medium" in cl or "माध्यम" in cl:
+                val = re.sub(r"^(?:medium|माध्यम)\s*[:\-]?\s*", "", cell, flags=re.I).strip()
+                if val:
+                    sh_med = val
+                elif c_idx + 1 < len(row_cells):
+                    sh_med = row_cells[c_idx + 1].strip()
+                break
+        if sh_med: break
+
+    if any(k in sh_med.lower() for k in ["english", "अंग्रेजी"]):
         default_st_medium = "English"
-    elif any(k in str(sch_med).lower() for k in ["marathi", "मराठी"]):
+    elif any(k in sh_med.lower() for k in ["hindi", "हिन्दी"]):
+        default_st_medium = "Hindi (हिन्दी)"
+    elif any(k in sh_med.lower() for k in ["marathi", "मराठी"]):
         default_st_medium = "Marathi (मराठी)"
-    elif any(k in str(sch_med).lower() for k in ["urdu", "उर्दू"]):
+    elif any(k in sh_med.lower() for k in ["urdu", "उर्दू"]):
         default_st_medium = "Urdu (اردو)"
     else:
-        default_st_medium = "Hindi (हिन्दी)"
+        sch_med = "Hindi (हिन्दी)"
+        try:
+            sch_med = st.session_state.school_info.get("medium", "Hindi (हिन्दी)")
+        except Exception:
+            pass
+        if any(k in str(sch_med).lower() for k in ["english", "अंग्रेजी"]):
+            default_st_medium = "English"
+        elif any(k in str(sch_med).lower() for k in ["marathi", "मराठी"]):
+            default_st_medium = "Marathi (मराठी)"
+        elif any(k in str(sch_med).lower() for k in ["urdu", "उर्दू"]):
+            default_st_medium = "Urdu (اردو)"
+        else:
+            default_st_medium = "Hindi (हिन्दी)"
 
     for r in range(h_idx + 1, len(raw_df)):
         row = raw_df.iloc[r]
